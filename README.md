@@ -15,9 +15,28 @@ It blends the two existing templates:
 | Job look-ahead | Tap-to-cycle day grid, or paint blue/red by dragging. Tasks can "start after" another task; when one runs long, the tasks after it move out automatically. "Lost day" pushes the rest of the schedule back a workday on one or several jobs. |
 | Look-ahead sheets | One branded letter-landscape page per job, printed or saved to PDF in one tap. |
 | Send this week's look-aheads | Saves a copy of each job's look-ahead for the week, so the office can see who has sent theirs. |
-| Team (admins) | Who has sent this week, when each super last opened the app, and **+ Add super** to create a new access code. |
+| Team (admins) | Who has sent this week, when each super last opened the app, **+ Add super**, and **New sign-in link** for a super who lost theirs. |
+| Import schedule (admins) | Brings in an existing schedule and assigns it to a super. See below. |
 
-Supers sign in once per iPad with a personal access code. Without a code, "Try it with sample jobs" opens a demo that saves nothing to the server.
+## Each super has their own page
+
+- A super only ever sees, edits and sends the jobs assigned to them. The server enforces this: `la_get_jobs` returns only their jobs and `la_save_job` refuses anyone else's.
+- Admins see every job, create, import and delete jobs, and pick the super on each job.
+- Each super gets a personal sign-in link (`…/#k=CODE`). Tapping it signs them in; the 8-letter code in it also works on the sign-in screen. Supers can't create or delete jobs, and the job header (Job #, name, PM/CM, super) is read-only for them.
+
+## Importing existing schedules
+
+Admins tap **Import schedule** and pick a file. A preview shows the job name, Job #, type, which super it goes to, and how many tasks were found, before anything is saved.
+
+| File | How it's read |
+|---|---|
+| Microsoft Project `.xml` (File › Save As › XML) | Summary tasks become section rows (the last two levels, e.g. "Warehouse › Bridge"). Each task fills its workdays; critical tasks and milestones are red. Finish-to-start links become "starts after" where the dates already follow them. |
+| Excel / CSV task list | Any sheet with task name, start and finish columns. Optional: outline level or WBS, % complete, critical, resource/responsible, predecessors. |
+| Look-ahead spreadsheets | A row of day numbers with B/R/X marks (or blue/red fills) under it, like the restoration template or the JIE DU INN weekly update. All-caps rows with no marks become sections. |
+
+"Leave out tasks that are already finished" (on by default) skips tasks at 100% or that ended before this week. `.mpp` files can't be read in the browser; save them as XML from Project first.
+
+Supers sign in once per iPad. Without a code, "Try it with sample jobs" opens a demo that saves nothing to the server.
 
 ## How it works
 
@@ -25,7 +44,7 @@ Supers sign in once per iPad with a personal access code. Without a code, "Try i
 iPad / browser (index.html on GitHub Pages, works offline)
    │  saves each job a moment after an edit; queues edits when there's no signal
    ▼
-Supabase "HCI Inventory" project: la_* functions → la_jobs, la_tasks, la_submissions, la_supers
+Supabase "3-week-Lookahead" project: la_* functions → la_jobs, la_tasks, la_submissions, la_supers
 ```
 
 - Tables are deny-all under RLS. The app only calls `la_*` functions, and each call carries the super's access code. Codes are stored hashed.
@@ -38,11 +57,11 @@ Supabase "HCI Inventory" project: la_* functions → la_jobs, la_tasks, la_submi
 |---|---|
 | `index.html` | The whole app |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Offline support and the home-screen icon |
-| `sql/01_lookahead_schema.sql` | Tables and functions (already applied to the HCI Inventory project) |
+| `sql/01_lookahead_schema.sql` | Tables and functions (already applied to the 3-week-Lookahead project) |
 
 ## Adding supers
 
-In the app: sign in with an admin code, open **Team**, tap **+ Add super**. The code is shown once; text it to the super with the app link.
+In the app: sign in as an admin, open **Team**, tap **+ Add super**, then **Copy link** and text it to the super. The link is shown once; **New sign-in link** makes a fresh one and turns off the old one.
 
 From the Supabase SQL editor (first admin, or resetting a lost code):
 

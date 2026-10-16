@@ -119,13 +119,15 @@ begin
 end $$;
 
 -- Upsert one whole job (header + all tasks). Each save writes a new revision of
--- the task list; older revisions stay as history. Returns the saved job.
+-- the task list; older revisions stay as history. Supers can only save jobs they own;
+-- admins can save any job and assign it to a super with p_job.superId.
 create or replace function public.la_save_job(p_code text, p_job jsonb) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   s public.la_supers := public.la_who(p_code);
   v_id uuid := (p_job->>'id')::uuid;
   v_owner uuid;
+  v_target uuid;
   j public.la_jobs;
   t jsonb; i int := 0;
 begin
@@ -133,12 +135,17 @@ begin
   if v_owner is not null and v_owner <> s.id and not s.is_admin then
     raise exception 'That job belongs to another super' using errcode = '42501';
   end if;
+  v_target := coalesce(v_owner, s.id);
+  if s.is_admin and nullif(p_job->>'superId','') is not null then
+    select id into v_target from public.la_supers where id = (p_job->>'superId')::uuid and active;
+    if v_target is null then raise exception 'Unknown super' using errcode = '22023'; end if;
+  end if;
   insert into public.la_jobs as x (id, super_id, number, name, mode, cm, sup_name, color, weekends, sort, rev, updated_at)
-  values (v_id, coalesce(v_owner, s.id), coalesce(p_job->>'number',''), coalesce(p_job->>'name',''),
+  values (v_id, v_target, coalesce(p_job->>'number',''), coalesce(p_job->>'name',''),
           case when p_job->>'mode' = 'com' then 'com' else 'res' end, coalesce(p_job->>'cm',''),
           coalesce(p_job->>'sup',''), coalesce(p_job->>'color','#F7943F'),
           coalesce((p_job->>'weekends')::boolean,false), coalesce((p_job->>'sort')::int,0), 1, now())
-  on conflict (id) do update set number = excluded.number, name = excluded.name, mode = excluded.mode,
+  on conflict (id) do update set super_id = excluded.super_id, number = excluded.number, name = excluded.name, mode = excluded.mode,
      cm = excluded.cm, sup_name = excluded.sup_name, color = excluded.color, weekends = excluded.weekends,
      sort = excluded.sort, archived = false, rev = x.rev + 1, updated_at = now()
   returning * into j;
@@ -197,6 +204,18 @@ begin
   return v_code;
 end $$;
 
+-- Admin: issue a new code for a super (the old one stops working). Returns the new code once.
+create or replace function public.la_reset_code(p_code text, p_super_id uuid) returns text
+language plpgsql security definer set search_path = '' as $$
+declare s public.la_supers := public.la_who(p_code); v_code text;
+begin
+  if not s.is_admin then raise exception 'Admins only' using errcode = '42501'; end if;
+  v_code := upper(substr(translate(encode(extensions.gen_random_bytes(12),'base64'),'+/=0O1lI',''),1,8));
+  update public.la_supers set code_hash = public.la_hash(v_code), active = true where id = p_super_id;
+  if not found then raise exception 'Unknown super' using errcode = '22023'; end if;
+  return v_code;
+end $$;
+
 -- SQL-editor only (not granted to the app): first admin, or a code reset.
 create or replace function public.la_bootstrap_super(p_name text, p_code text, p_is_admin boolean) returns uuid
 language sql security definer set search_path = '' as $$
@@ -209,7 +228,7 @@ revoke all on function public.la_who(text), public.la_hash(text), public.la_job_
   public.la_bootstrap_super(text,text,boolean) from public, anon, authenticated;
 revoke all on function public.la_login(text), public.la_get_jobs(text), public.la_save_job(text,jsonb),
   public.la_archive_job(text,uuid), public.la_submit(text,uuid[],date), public.la_week_report(text,date),
-  public.la_add_super(text,text,boolean) from public;
+  public.la_add_super(text,text,boolean), public.la_reset_code(text,uuid) from public;
 grant execute on function public.la_login(text), public.la_get_jobs(text), public.la_save_job(text,jsonb),
   public.la_archive_job(text,uuid), public.la_submit(text,uuid[],date), public.la_week_report(text,date),
-  public.la_add_super(text,text,boolean) to anon, authenticated;
+  public.la_add_super(text,text,boolean), public.la_reset_code(text,uuid) to anon, authenticated;
