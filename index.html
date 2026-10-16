@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Haggerty Look-Ahead</title>
+<meta name="theme-color" content="#F7943F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Look-Ahead">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+html{height:100%}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+/* Layout: one app bar, then a working surface. Dashboard = all jobs on one grid; job = tap-to-fill day grid; sheets = printable paper pages. */
+:root{
+  --bg:#F4F3F1; --surface:#FFFFFF; --surface-2:#ECEAE6; --line:#DCD8D2; --line-2:#C9C4BC;
+  --ink:#262727; --ink-2:#615E59; --brand:#F7943F; --brand-ink:#A9560E; --brand-soft:#FDE9D6;
+  --mark:#4D4E4E; --blue:#1764F4; --blue-soft:#DCE7FE; --red:#E0262B; --red-soft:#FBDCDD;
+  --weekend:#EBE8E3; --scrim:rgba(20,20,20,.45); --shadow:0 1px 2px rgba(40,30,20,.08),0 6px 24px rgba(40,30,20,.08);
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#151616; --surface:#1F2121; --surface-2:#292B2B; --line:#363939; --line-2:#4A4D4D;
+  --ink:#EDECEA; --ink-2:#A8A59F; --brand:#F7943F; --brand-ink:#F8A660; --brand-soft:#3A2A1C;
+  --mark:#E2E1DF; --blue:#3B7DFF; --blue-soft:#1C2B4A; --red:#F0443F; --red-soft:#4A2021;
+  --weekend:#252727; --scrim:rgba(0,0,0,.6); --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#151616; --surface:#1F2121; --surface-2:#292B2B; --line:#363939; --line-2:#4A4D4D;
+  --ink:#EDECEA; --ink-2:#A8A59F; --brand:#F7943F; --brand-ink:#F8A660; --brand-soft:#3A2A1C;
+  --mark:#E2E1DF; --blue:#3B7DFF; --blue-soft:#1C2B4A; --red:#F0443F; --red-soft:#4A2021;
+  --weekend:#252727; --scrim:rgba(0,0,0,.6); --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.4;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--surface)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* App bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--mark);border:0;background:none;padding:0}
+.logo svg{height:28px;width:auto;display:block}
+.logo b{font-family:var(--f-display);font-weight:700;font-size:24px;letter-spacing:.04em;line-height:1}
+.logo small{display:block;font-size:10px;letter-spacing:.14em;color:var(--brand-ink);font-weight:600;text-transform:uppercase;margin-top:2px}
+.nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.nav button{border:0;background:none;padding:8px 12px;border-radius:8px;font-weight:600;color:var(--ink-2)}
+.nav button[aria-current="true"]{background:var(--brand-soft);color:var(--brand-ink)}
+
+main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 60px;max-width:1400px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance}
+h1{font-size:30px;line-height:1.1}
+h2{font-size:22px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--brand-ink)}
+.muted{color:var(--ink-2)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+
+.btn{border:1px solid var(--line-2);background:var(--surface);padding:9px 14px;border-radius:9px;font-weight:600;min-height:40px;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--ink-2)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#231507}
+.btn.primary:hover{filter:brightness(.96)}
+.btn.ghost{border-color:transparent;background:none}
+.btn.sm{min-height:32px;padding:5px 10px;font-size:13px;border-radius:7px}
+.btn.danger{color:var(--red);border-color:var(--red)}
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:10px;padding:3px;background:var(--surface);gap:2px}
+.seg button{border:0;background:none;padding:6px 12px;border-radius:7px;font-weight:600;color:var(--ink-2);min-height:34px;display:inline-flex;align-items:center;gap:6px}
+.seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--ink)}
+.sw{display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid var(--line-2)}
+.sw.b{background:var(--blue);border-color:var(--blue)}.sw.r{background:var(--red);border-color:var(--red)}
+.pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:999px;border:1px solid var(--line-2);color:var(--ink-2);white-space:nowrap}
+.pill.res{border-color:var(--brand);color:var(--brand-ink)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+input[type=text],input[type=date],select{border:1px solid var(--line-2);background:var(--surface);border-radius:8px;padding:7px 9px;min-height:38px}
+label.chk{display:inline-flex;align-items:center;gap:6px;font-weight:500}
+label.chk input{width:18px;height:18px;accent-color:var(--brand)}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 0}
+.scroller{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.hint{font-size:13px;color:var(--ink-2)}
+.example{font-size:12px;color:var(--ink-2);border:1px dashed var(--line-2);border-radius:8px;padding:6px 10px}
+
+/* Stats */
+.stats{display:flex;gap:28px;flex-wrap:wrap;margin:6px 0 4px}
+.stat b{font-family:var(--f-display);font-size:28px;line-height:1;display:block}
+.stat span{font-size:12px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+
+/* Grids (shared by gantt + job editor) */
+table.grid{border-collapse:separate;border-spacing:0;font-size:13px;min-width:100%}
+.grid th,.grid td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:0;height:38px;background:var(--surface)}
+.grid thead th{background:var(--surface-2);font-weight:600;color:var(--ink-2);position:sticky;top:0;z-index:2}
+.grid thead tr.mo th{height:24px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;text-align:left;padding-left:6px;color:var(--ink)}
+.grid thead tr.dy th{height:40px}
+.grid th.dh{width:34px;min-width:34px;text-align:center;line-height:1.05;font-size:11px}
+.grid th.dh b{display:block;font-size:14px;color:var(--ink)}
+.grid .we{background:var(--weekend)}
+.grid thead th.we{background:var(--weekend)}
+.grid .wk{border-left:2px solid var(--line-2)}
+.grid th.dh.today{background:var(--brand);color:#231507}
+.grid th.dh.today b{color:#231507}
+.grid td.today{box-shadow:inset 2px 0 0 var(--brand),inset -2px 0 0 var(--brand)}
+.stick{position:sticky;left:0;z-index:1}
+thead .stick{z-index:3}
+.grid td.d{width:34px;min-width:34px;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.grid.paint td.d{touch-action:none}
+.grid td.d.b{background:var(--blue)}
+.grid td.d.r{background:var(--red)}
+.grid td.d:hover:not(.b):not(.r){background:var(--blue-soft)}
+.grid td.d.b.today,.grid td.d.r.today{box-shadow:inset 2px 0 0 var(--brand),inset -2px 0 0 var(--brand)}
+
+/* editor left columns */
+.c-id{width:40px;min-width:40px;text-align:center;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.c-task{min-width:210px;width:230px;left:40px}
+.c-res{min-width:120px;width:130px}
+.c-dt{min-width:62px;width:62px;text-align:center;font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:12.5px}
+.c-act{width:40px;min-width:40px;text-align:center}
+.grid td input.cell{border:0;background:transparent;width:100%;height:37px;padding:0 8px;border-radius:0;min-height:0}
+.grid td input.cell:focus{background:var(--brand-soft);outline:none}
+tr.sec td{background:var(--surface-2)}
+tr.sec input.cell{font-family:var(--f-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase}
+tr.sec td.secfill{background:var(--surface-2)}
+.dep{font-size:11px;color:var(--ink-2);padding:0 8px;display:block;margin-top:-10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn{border:0;background:none;width:36px;height:36px;border-radius:8px;color:var(--ink-2);font-size:18px;line-height:1}
+.iconbtn:hover{background:var(--surface-2);color:var(--ink)}
+
+/* gantt */
+.g-job{min-width:260px;width:280px;padding:6px 10px!important}
+.g-job .nm{font-weight:700;display:flex;gap:8px;align-items:center}
+.g-job .sub{font-size:12px;color:var(--ink-2);display:flex;gap:8px;align-items:center;margin-top:2px}
+.g-job .acts{display:flex;gap:6px;margin-top:6px}
+tr.jobrow td.d{cursor:pointer}
+td.sum{position:relative}
+td.sum.sb{background:var(--blue-soft)} td.sum.sr{background:var(--red-soft)}
+td.sum i{position:absolute;left:4px;right:4px;top:50%;height:12px;margin-top:-6px;border-radius:3px;background:var(--blue)}
+td.sum.sr i{background:var(--red)}
+td.sum em{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:10px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
+tr.taskrow th{font-weight:500;font-size:13px;text-align:left;padding:0 10px 0 30px!important;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+tr.taskrow td{height:28px}
+
+/* week + today */
+.week{display:grid;grid-template-columns:repeat(var(--cols),minmax(150px,1fr));gap:10px;min-width:calc(var(--cols)*160px)}
+.daycol{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.daycol.today{border-color:var(--brand);box-shadow:inset 0 3px 0 var(--brand)}
+.daycol.we{background:var(--weekend)}
+.daycol h3{font-size:18px;display:flex;justify-content:space-between;align-items:baseline}
+.chip{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:8px;padding:6px 8px;background:var(--surface);text-align:left;width:100%;display:block}
+.chip .j{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2)}
+.chip .t{font-size:13px;display:flex;gap:6px;align-items:center;min-width:0}
+.chip .t span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.card li{display:flex;gap:8px;align-items:center;font-size:14px}
+.empty{color:var(--ink-2);font-size:13px}
+
+/* job header */
+.jobhead{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;padding:14px;margin-top:12px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field span{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.field input{width:100%}
+
+/* modal */
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:50;display:flex;align-items:flex-end;justify-content:center;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom,0px))}
+@media (min-width:700px){.scrim{align-items:center}}
+.modal{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);width:min(520px,100%);max-height:85vh;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+.modal .field select,.modal .field input{width:100%}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;z-index:60;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
+.legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--ink-2)}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+
+/* Paper sheets: deliberately always light, like the printed page */
+.sheets{display:flex;flex-direction:column;gap:22px;align-items:flex-start}
+.sheetwrap{max-width:100%;overflow-x:auto;border-radius:6px;box-shadow:var(--shadow)}
+.sheet{width:1056px;min-height:600px;background:#fff;color:#1f1f1f;padding:30px 32px;font-family:var(--f-body);font-size:12px;display:flex;flex-direction:column;gap:14px}
+.sheet .sh-top{display:flex;align-items:flex-start;gap:20px;border-bottom:3px solid #F7943F;padding-bottom:12px}
+.sheet .sh-logo{display:flex;align-items:center;gap:8px;color:#4D4E4E}
+.sheet .sh-logo svg{height:34px;width:auto}
+.sheet .sh-logo b{font-family:var(--f-display);font-size:28px;letter-spacing:.04em;line-height:1}
+.sheet .sh-logo small{display:block;font-size:9px;letter-spacing:.14em;color:#C66A1C;font-weight:700;margin-top:2px}
+.sheet .sh-title{margin-left:auto;text-align:right}
+.sheet .sh-title h2{font-size:24px;color:#1f1f1f}
+.sheet .sh-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:4px 18px}
+.sheet .sh-meta div{border-bottom:1px solid #ddd;padding:3px 0;display:flex;gap:8px;min-width:0}
+.sheet .sh-meta span{font-weight:700;color:#666;text-transform:uppercase;font-size:10px;letter-spacing:.08em;flex:none;padding-top:1px}
+.sheet table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:11.5px}
+.sheet th,.sheet td{border:1px solid #cfcfcf;height:22px;padding:0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet thead th{background:#F1F0EE;font-size:10px;color:#444}
+.sheet th.d,.sheet td.d{padding:0;text-align:center;width:22px}
+.sheet .we{background:#F1F0EE}
+.sheet .tdy{outline:2px solid #F7943F;outline-offset:-2px}
+.sheet td.b{background:#1764F4}.sheet td.r{background:#E0262B}
+.sheet tr.sec td{background:#4D4E4E;color:#fff;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:10.5px}
+.sheet .sh-foot{margin-top:auto;display:flex;justify-content:space-between;color:#777;font-size:10px;border-top:1px solid #ddd;padding-top:8px}
+.sheet .lg{display:flex;gap:14px;align-items:center}
+.sheet .lg i{display:inline-block;width:12px;height:12px;vertical-align:-2px;margin-right:4px}
+
+@media print{
+  @page{size:letter landscape;margin:.3in}
+  body{background:#fff}
+  .bar,.noprint,.toast{display:none!important}
+  main{padding:0;max-width:none}
+  .sheetwrap{box-shadow:none;overflow:visible}
+  .sheet{width:100%;page-break-after:always;padding:0}
+}
+@media (max-width:640px){h1{font-size:24px}.logo small{display:none}.nav{margin-left:0;width:100%}.nav button{flex:1}}
+@media (prefers-reduced-motion:no-preference){.btn,.seg button,.nav button{transition:background .12s,border-color .12s}}
+.sync{font-size:12px;font-weight:600;color:var(--ink-2);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.sync i{width:8px;height:8px;border-radius:50%;background:#3BA55C;display:inline-block}
+.sync.busy i{background:var(--brand)}.sync.off i{background:var(--red)}
+.who{border:1px solid var(--line-2);background:var(--surface);border-radius:999px;padding:5px 12px;font-weight:600;font-size:13px}
+.login{max-width:420px;margin:8vh auto 0;display:flex;flex-direction:column;gap:16px}
+.login input{font-size:22px;letter-spacing:.2em;text-transform:uppercase;text-align:center;padding:12px}
+.err{color:var(--red);font-weight:600}
+.sent{font-size:11px;font-weight:700;color:#2F8F4E;letter-spacing:.04em}
+table.plain{border-collapse:collapse;width:100%}
+table.plain th,table.plain td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+table.plain th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.code{font-family:ui-monospace,Menlo,monospace;font-size:22px;letter-spacing:.2em;font-weight:700;background:var(--surface-2);padding:10px 14px;border-radius:8px;text-align:center;user-select:all}
+</style>
+</head>
+<body>
+<header class="bar">
+  <button class="logo" id="home" aria-label="All jobs">
+    <svg viewBox="0 0 124 124" aria-hidden="true"><rect x="0" y="94" width="30" height="30" fill="#F7943F"/><rect x="47" y="46" width="30" height="30" fill="#F7943F"/><rect x="47" y="94" width="30" height="30" fill="#F7943F"/><rect x="94" y="0" width="30" height="124" fill="#F7943F"/></svg>
+    <span><b>HAGGERTY</b><small>Look-Ahead</small></span>
+  </button>
+  <nav class="nav" id="nav">
+    <button data-nav="dash">All jobs</button>
+    <button data-nav="job">Job look-ahead</button>
+    <button data-nav="sheets">Look-ahead sheets</button>
+    <button data-nav="team" id="navteam" hidden>Team</button>
+  </nav>
+  <span class="sync" id="sync" hidden><i></i><span>Saved</span></span>
+  <button class="who" id="who" hidden></button>
+</header>
+<main id="app"></main>
+<div id="layer"></div>
+
+<script>
+(function(){
+"use strict";
+const LOGO='<svg viewBox="0 0 124 124" aria-hidden="true"><rect x="0" y="94" width="30" height="30" fill="#F7943F"/><rect x="47" y="46" width="30" height="30" fill="#F7943F"/><rect x="47" y="94" width="30" height="30" fill="#F7943F"/><rect x="94" y="0" width="30" height="124" fill="#F7943F"/></svg>';
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MO=MONTHS.map(m=>m.slice(0,3));
+const DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const JOBCOLORS=["#F7943F","#2E9E8F","#7A5BD6","#D64B7A","#3D8BD9","#8C9A2B","#C2582E","#4F6D7A","#B8860B","#5A8F4E"];
+
+/* ---------- dates (local, string keys YYYY-MM-DD) ---------- */
+const k=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const p=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
+const add=(s,n)=>{const d=p(s);d.setDate(d.getDate()+n);return k(d)};
+const dow=s=>p(s).getDay();
+const isWE=s=>{const g=dow(s);return g===0||g===6};
+const mondayOf=s=>add(s,-((dow(s)+6)%7));
+const addWork=(s,n,we)=>{if(we)return add(s,n);let st=n>0?1:-1,c=Math.abs(n),d=s;while(c>0){d=add(d,st);if(!isWE(d))c--}return d};
+const nextWork=(s,we)=>{let d=s;if(!we)while(isWE(d))d=add(d,1);return d};
+const fmt=s=>s?MO[p(s).getMonth()]+" "+p(s).getDate():"";
+const fmtLong=s=>DOW[dow(s)]+", "+MO[p(s).getMonth()]+" "+p(s).getDate();
+const TODAY=k(new Date());
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>(crypto.randomUUID?crypto.randomUUID():"10000000-1000-4000-8000-100000000000".replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)));
+/* Supabase (HCI Inventory project). The publishable key is meant to be public:
+   tables are deny-all and every call goes through la_* functions that check the super's access code. */
+const SB_URL="https://tdflgfuqjnwctadsjizz.supabase.co";
+const SB_KEY="sb_publishable_w9xkQQE07152NL8faFVTwQ_LSJ9Hf_d";
+async function rpc(fn,args){
+  const r=await fetch(SB_URL+"/rest/v1/rpc/"+fn,{method:"POST",headers:{apikey:SB_KEY,"Content-Type":"application/json"},body:JSON.stringify(args)});
+  const txt=await r.text();
+  if(!r.ok){let m="";try{m=JSON.parse(txt).message}catch(e){}const err=new Error(m||("Server error "+r.status));err.status=r.status;throw err}
+  return txt?JSON.parse(txt):null}
+
+/* ---------- example data, built relative to this week ---------- */
+const SUPNAME=()=>(S.me&&S.me.name)||"Superintendent A";
+function seed(){
+  const mon=mondayOf(TODAY);
+  const W=[];for(let d=mon;W.length<40;d=add(d,1))if(!isWE(d))W.push(d);
+  const T=(name,res,o,len,opt={})=>{const t={id:uid(),name,res,after:null,cells:{}};
+    if(len)for(let i=0;i<len;i++)t.cells[W[Math.max(0,o+i)]]=(opt.r&&opt.r.includes(i))||opt.allR?"R":"B";
+    if(opt.sec){t.sec=true;delete t.cells}return t};
+  const S=name=>({id:uid(),name,sec:true,cells:{}});
+  const link=(arr)=>{for(let i=1;i<arr.length;i++)if(!arr[i].sec&&arr[i].link!==undefined)arr[i].after=arr[arr[i].link].id;arr.forEach(t=>delete t.link);return arr};
+  const L=(t,i)=>(t.link=i,t);
+  const jobs=[
+    {name:"123 Main St, Stockton",number:"24-118 RCN",mode:"res",cm:"Claims Manager",sup:SUPNAME(),tasks:link([
+      T("Final moisture readings","Mitigation crew",0,1,{allR:true}),
+      L(T("Demo","Haggerty crew",1,2),0),
+      L(T("Framing repairs","Haggerty crew",2,2),1),
+      L(T("Electrical repairs","ABC Electric",3,2),2),
+      L(T("Insulation","Insulator",5,1),3),
+      L(T("Insulation inspection","City inspector",6,1,{allR:true}),4),
+      L(T("Hang drywall","Drywall sub",7,2),5),
+      L(T("Tape, texture","Drywall sub",9,3),6),
+      L(T("Prime and paint","Painter",12,3),7),
+      L(T("Final walk with adjuster","Super / CM",15,1,{allR:true}),8)])},
+    {name:"48 Oak Ridge Ct, Lodi",number:"24-131 FIRE",mode:"res",cm:"Claims Manager",sup:SUPNAME(),tasks:link([
+      T("Contents pack-out","Pack-out crew",0,3),
+      L(T("Soot and smoke cleaning","Cleaning crew",3,4),0),
+      T("Roof tear-off and dry-in","Roofer",4,3,{r:[2]}),
+      L(T("Electrical rough","ABC Electric",7,3),1),
+      L(T("Rough inspection","City inspector",10,1,{allR:true}),3),
+      L(T("Insulation and drywall","Drywall sub",11,5),4)])},
+    {name:"917 Pacific Ave, Stockton",number:"24-140 RCN",mode:"res",cm:"Claims Manager",sup:SUPNAME(),tasks:link([
+      T("Cabinet tear-out","Haggerty crew",1,1),
+      L(T("Plumbing repair","Plumber",2,2),0),
+      L(T("Drywall patch","Drywall sub",4,2),1),
+      L(T("Cabinet delivery","Supplier",8,1,{allR:true}),2),
+      L(T("Cabinet install","Cabinet installer",9,2),3),
+      L(T("Countertop template","Counter fab",11,1,{allR:true}),4)])},
+    {name:"2210 Grand Canal Blvd",number:"24-152 MOLD",mode:"res",cm:"Claims Manager",sup:SUPNAME(),tasks:link([
+      T("Containment setup","Remediation crew",0,1),
+      L(T("Mold removal","Remediation crew",1,3),0),
+      L(T("Clearance test","Hygienist",4,1,{allR:true}),1),
+      L(T("Rebuild walls","Haggerty crew",6,4),2)])},
+    {name:"UOP Jie Du Inn",number:"C-2207",mode:"com",cm:"Project Manager",sup:SUPNAME(),tasks:link([
+      S("Submittals"),
+      T("Electrical","ABC Electric",0,2),
+      T("Plumbing","Plumber",1,2),
+      T("HVAC","Mech sub",3,4),
+      T("Fire protection","Fire sprinkler sub",3,3,{r:[2]}),
+      T("Windows","Glazing sub",1,5),
+      S("Third floor"),
+      T("Frame walls","Framing sub",2,4),
+      L(T("Electrical rough","ABC Electric",5,4),7),
+      L(T("Plumbing rough","Plumber",9,3),7),
+      L(T("Fire protection rough","Fire sprinkler sub",7,3),7),
+      S("Second floor"),
+      T("Frame walls","Framing sub",2,7),
+      L(T("Electrical rough","ABC Electric",9,5),12),
+      L(T("HVAC rough","Mech sub",14,4),12),
+      S("Inspections"),
+      L(T("Third floor rough inspection","City inspector",12,1,{allR:true}),9)])},
+    {name:"Lodi Unified Admin TI",number:"C-2214",mode:"com",cm:"Project Manager",sup:SUPNAME(),tasks:link([
+      S("Demo"),
+      T("Demo ceilings and walls","Haggerty crew",0,3),
+      S("Rough-in"),
+      L(T("Electrical rough","ABC Electric",3,4),1),
+      L(T("Data cabling","Low voltage sub",5,3),3),
+      L(T("Above-ceiling inspection","City inspector",8,1,{allR:true}),3),
+      S("Finishes"),
+      L(T("Ceiling grid and tile","Acoustical sub",9,4),5),
+      L(T("Paint","Painter",11,3),7)])}
+  ];
+  jobs.forEach((j,i)=>{j.id=uid();j.color=JOBCOLORS[i%JOBCOLORS.length];j.weekends=false;j.example=true;
+    j.tasks.forEach(t=>{if(!t.cells)t.cells={}});reflow(j);});
+  return jobs;
+}
+
+/* ---------- state ---------- */
+const KEY="haggerty-lookahead-v2",CODEKEY="haggerty-lookahead-code";
+let S={me:null,code:null,demo:false,supers:[],superFilter:"all",synced:{},archived:[],jobs:[],start:mondayOf(TODAY),weeks:3,hideWE:false,view:"dash",tab:"gantt",jobId:null,brush:"cycle",filter:"all",open:{},sheetIds:null};
+const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+function cacheKey(){return KEY+":"+(S.demo?"demo":S.me&&S.me.id)}
+function persist(){ls.set(cacheKey(),JSON.stringify({jobs:S.jobs,synced:S.synced,archived:S.archived,supers:S.supers}));ls.set(KEY+":prefs",JSON.stringify({weeks:S.weeks,hideWE:S.hideWE}))}
+function loadPrefs(){try{const p=JSON.parse(ls.get(KEY+":prefs")||"{}");S.weeks=p.weeks||3;S.hideWE=!!p.hideWE}catch(e){}}
+function loadCache(){try{const d=JSON.parse(ls.get(cacheKey())||"null");if(d){S.jobs=d.jobs||[];S.synced=d.synced||{};S.archived=d.archived||[];S.supers=d.supers||[];return true}}catch(e){}return false}
+/* jobJSON is what the server stores; a job is dirty when it differs from the last copy the server accepted */
+const jobJSON=(j,i)=>JSON.stringify({id:j.id,number:j.number||"",name:j.name||"",mode:j.mode,cm:j.cm||"",sup:j.sup||"",color:j.color,weekends:!!j.weekends,sort:i,
+  tasks:j.tasks.map(t=>({id:t.id,name:t.name||"",res:t.res||"",sec:!!t.sec,after:t.after||null,cells:t.cells||{}}))});
+function save(){persist();if(!S.demo)scheduleSync()}
+let syncTimer=null,syncing=false;
+function setSync(state,text){const el=$("#sync");if(!el)return;el.hidden=S.demo||!S.me;el.className="sync"+(state?" "+state:"");el.querySelector("span").textContent=text}
+function pending(){return S.archived.length+S.jobs.filter((j,i)=>S.synced[j.id]!==jobJSON(j,i)).length}
+function scheduleSync(){clearTimeout(syncTimer);setSync("busy","Saving…");syncTimer=setTimeout(syncNow,700)}
+async function syncNow(){
+  if(syncing||S.demo||!S.code){return}
+  syncing=true;
+  try{
+    while(S.archived.length){await rpc("la_archive_job",{p_code:S.code,p_job_id:S.archived[0]});S.archived.shift();persist()}
+    for(let i=0;i<S.jobs.length;i++){const j=S.jobs[i],body=jobJSON(j,i);if(S.synced[j.id]===body)continue;
+      const saved=await rpc("la_save_job",{p_code:S.code,p_job:JSON.parse(body)});S.synced[j.id]=body;if(saved){j.superId=saved.superId;j.rev=saved.rev}persist()}
+    setSync("","Saved")
+  }catch(e){
+    if(e.status===401||e.status===403||/access code/i.test(e.message)){setSync("off","Signed out");signOut("Your access code no longer works. Ask Liam for a new one.");}
+    else{setSync("off",navigator.onLine===false?"Offline, will sync":"Not saved, retrying");clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,15000)}
+  }finally{syncing=false}
+  if(pending()&&!syncTimer)scheduleSync()
+}
+window.addEventListener("online",()=>{if(pending())syncNow()});
+async function pull(){
+  const d=await rpc("la_get_jobs",{p_code:S.code});
+  const server=d.jobs||[];S.supers=d.supers||[];
+  /* keep local edits that have not reached the server yet */
+  const local=new Map(S.jobs.map((j,i)=>[j.id,{j,i}]));
+  const merged=server.map(sj=>{const l=local.get(sj.id);if(l&&S.synced[sj.id]!==jobJSON(l.j,l.i))return l.j;
+    S.synced[sj.id]=null;const j={...sj,tasks:(sj.tasks||[]).map(t=>({...t,cells:t.cells||{}}))};return j});
+  S.jobs.forEach((j,i)=>{if(!server.some(x=>x.id===j.id)&&!S.synced[j.id]&&!S.archived.includes(j.id))merged.push(j)});
+  S.jobs=merged.filter(j=>!S.archived.includes(j.id));
+  S.jobs.forEach((j,i)=>{const sj=server.find(x=>x.id===j.id);if(sj&&S.synced[j.id]===null)S.synced[j.id]=jobJSON(j,i)});
+  persist();if(pending())scheduleSync();else setSync("","Saved")}
+function superName(id){const x=S.supers.find(s=>s.id===id);return x?x.name:""}const job=id=>S.jobs.find(j=>j.id===id);
+const curJob=()=>job(S.jobId)||S.jobs[0];
+
+const days=()=>{const out=[];for(let i=0;i<S.weeks*7;i++){const d=add(S.start,i);if(S.hideWE&&isWE(d))continue;out.push(d)}return out};
+const tStart=t=>{const ks=Object.keys(t.cells||{});return ks.length?ks.sort()[0]:""};
+const tEnd=t=>{const ks=Object.keys(t.cells||{});return ks.length?ks.sort()[ks.length-1]:""};
+const labels=j=>j.mode==="com"?{id:"Item",task:"Activity",res:"Responsible",cm:"PM",kind:"Commercial"}:{id:"ID",task:"Task name",res:"Resource",cm:"Claims mgr",kind:"Restoration"};
+
+/* ---------- scheduling logic: shifts and auto-adjust ---------- */
+function shiftTask(j,t,n){if(!n)return;const c={};for(const [d,v] of Object.entries(t.cells))c[addWork(d,n,j.weekends)]=v;t.cells=c}
+function dependents(j,t){return j.tasks.filter(x=>x.after===t.id)}
+function shiftWithDeps(j,t,n,seen=new Set()){if(seen.has(t.id))return;seen.add(t.id);shiftTask(j,t,n);dependents(j,t).forEach(x=>shiftWithDeps(j,x,n,seen))}
+/* push any task that now starts on/before its predecessor's finish to the next workday after it */
+function reflow(j){const moved=new Set();for(let guard=0;guard<60;guard++){let ch=false;
+  for(const t of j.tasks){if(!t.after||t.sec)continue;const pr=j.tasks.find(x=>x.id===t.after);if(!pr)continue;
+    const pe=tEnd(pr),ts=tStart(t);if(!pe||!ts||ts>pe)continue;
+    const target=addWork(pe,1,j.weekends);let n=0,d=nextWork(ts,j.weekends);while(d<target){d=addWork(d,1,j.weekends);n++}
+    if(n<1)n=1;shiftTask(j,t,n);moved.add(t.id);ch=true}
+  if(!ch)break}return moved.size}
+function lostDay(j,from){let count=0;for(const t of j.tasks){const c={};let hit=false;for(const [d,v] of Object.entries(t.cells||{})){if(d>=from){c[addWork(d,1,j.weekends)]=v;hit=true}else c[d]=v}
+  if(hit){t.cells=c;count++}}reflow(j);return count}
+function isAncestor(j,maybeAnc,t){let cur=maybeAnc,seen=new Set();while(cur&&!seen.has(cur.id)){if(cur.id===t.id)return true;seen.add(cur.id);cur=j.tasks.find(x=>x.id===cur.after)}return false}
+
+/* ---------- UI helpers ---------- */
+const $=s=>document.querySelector(s);
+let toastTimer;
+function toast(msg){let el=$(".toast");if(!el){el=document.createElement("div");el.className="toast";el.setAttribute("role","status");document.body.appendChild(el)}el.textContent=msg;el.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.hidden=true,2600)}
+function modal(html,bind){const L=$("#layer");L.innerHTML='<div class="scrim" id="scrim"><div class="modal" role="dialog" aria-modal="true">'+html+'</div></div>';
+  const close=()=>L.innerHTML="";$("#scrim").addEventListener("click",e=>{if(e.target.id==="scrim"||e.target.closest("[data-close]"))close()});bind&&bind(close);
+  const f=L.querySelector("input,select,button");f&&f.focus()}
+function go(view,extra){Object.assign(S,{view},extra||{});render();window.scrollTo(0,0)}
+
+function monthHeader(ds,leftCols,leftHtml){let h='<tr class="mo">'+(leftHtml||'<th class="stick" colspan="'+leftCols+'"></th>');let i=0;
+  while(i<ds.length){const m=p(ds[i]).getMonth();let n=0;while(i+n<ds.length&&p(ds[i+n]).getMonth()===m)n++;h+='<th colspan="'+n+'"'+(p(ds[i]).getDay()===1?' class="wk"':'')+'>'+(n>=4?MONTHS[m]+" "+p(ds[i]).getFullYear():MO[m])+'</th>';i+=n}return h+'</tr>'}
+function dayHeads(ds){return ds.map(d=>'<th class="dh'+(isWE(d)?" we":"")+(dow(d)===1?" wk":"")+(d===TODAY?" today":"")+'">'+DOW[dow(d)][0]+'<b>'+p(d).getDate()+'</b></th>').join("")}
+function windowBar(){return '<div class="seg" role="group" aria-label="Scroll the calendar">'+
+  '<button data-w="-1" aria-label="Previous week">‹ Week</button><button data-w="0">This week</button><button data-w="1" aria-label="Next week">Week ›</button></div>'+
+  '<input type="date" id="jump" aria-label="Jump to date" value="'+S.start+'">'+
+  '<select id="weeks" aria-label="Weeks shown">'+[2,3,4,6].map(n=>'<option value="'+n+'"'+(n===S.weeks?" selected":"")+'>'+n+' weeks</option>').join("")+'</select>'+
+  '<label class="chk"><input type="checkbox" id="hidewe"'+(S.hideWE?" checked":"")+'> Hide weekends</label>'}
+function bindWindow(){document.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{const w=+b.dataset.w;S.start=w?add(S.start,7*w):mondayOf(TODAY);render()});
+  const j=$("#jump");j&&(j.onchange=()=>{if(j.value){S.start=mondayOf(j.value);render()}});
+  const w=$("#weeks");w&&(w.onchange=()=>{S.weeks=+w.value;save();render()});
+  const h=$("#hidewe");h&&(h.onchange=()=>{S.hideWE=h.checked;save();render()})}
+function rangeLabel(){const ds=[S.start,add(S.start,S.weeks*7-1)];return fmt(ds[0])+" – "+fmt(ds[1])+", "+p(ds[1]).getFullYear()}
+
+/* ---------- Dashboard ---------- */
+function visibleJobs(){return S.jobs.filter(j=>(S.filter==="all"||j.mode===S.filter)&&(S.superFilter==="all"||j.superId===S.superFilter))}
+function renderDash(){
+  const js=visibleJobs(),ds=days();
+  let todayCount=0,critWeek=0;const wkEnd=add(mondayOf(TODAY),6);
+  S.jobs.forEach(j=>j.tasks.forEach(t=>{for(const [d,v] of Object.entries(t.cells||{})){if(d===TODAY)todayCount++;if(v==="R"&&d>=TODAY&&d<=wkEnd)critWeek++}}));
+  const admin=S.me&&S.me.isAdmin;
+  let h='<div class="row"><div><div class="eyebrow">'+esc(S.demo?"Demo mode · nothing is saved to the server":(S.me.name+(admin?" · admin, all supers":" · all projects")))+'</div><h1>'+(admin?"All jobs":"My jobs")+'</h1></div><span class="spacer"></span>'+
+    '<button class="btn" id="newjob">+ New job</button><button class="btn" id="rainall">Lost day…</button><button class="btn" id="mkall">Look-ahead sheets</button>'+(S.demo?'':'<button class="btn primary" id="sendwk">Send this week’s look-aheads</button>')+'</div>'+
+    '<div class="stats"><div class="stat"><b class="num">'+S.jobs.length+'</b><span>Active jobs</span></div><div class="stat"><b class="num">'+todayCount+'</b><span>Tasks today</span></div><div class="stat"><b class="num" style="color:var(--red)">'+critWeek+'</b><span>Critical items left this week</span></div></div>'+
+    (!S.jobs.length?'<div class="panel" style="padding:18px;margin:14px 0;display:flex;flex-direction:column;gap:10px"><h2>No jobs yet</h2><p class="muted" style="margin:0">Add your first job, or load six sample jobs to see how it works. You can delete the samples later.</p><div class="row"><button class="btn primary" id="newjob2">+ New job</button><button class="btn" id="addsamples">Load sample jobs</button></div></div>':'')+
+    (admin&&S.supers.length>1?'<div class="toolbar"><label class="field" style="flex-direction:row;align-items:center;gap:8px"><span>Super</span><select id="supf"><option value="all">Everyone</option>'+S.supers.map(x=>'<option value="'+x.id+'"'+(S.superFilter===x.id?" selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label></div>':'')+
+    '<div class="toolbar"><div class="seg" role="group" aria-label="View">'+
+    [["gantt","Gantt"],["week","Week calendar"],["today","Plan my day"]].map(([v,l])=>'<button data-tab="'+v+'" aria-pressed="'+(S.tab===v)+'">'+l+'</button>').join("")+'</div>'+
+    '<div class="seg" role="group" aria-label="Filter">'+[["all","All"],["res","Restoration"],["com","Commercial"]].map(([v,l])=>'<button data-f="'+v+'" aria-pressed="'+(S.filter===v)+'">'+l+'</button>').join("")+'</div>'+
+    '<span class="spacer"></span>'+(S.tab!=="today"?windowBar():"")+'</div>';
+  if(S.tab==="gantt")h+=ganttHTML(js,ds);
+  else if(S.tab==="week")h+=weekHTML(js);
+  else h+=todayHTML(js);
+  h+='<div class="row" style="margin-top:22px"><div class="legend"><span><i class="sw b"></i>Scheduled work</span><span><i class="sw r"></i>Critical: inspection, delivery, deadline</span></div><span class="spacer"></span>'+(S.demo?'<button class="btn ghost sm" id="reset">Reset sample data</button>':'')+'</div>';
+  $("#app").innerHTML=h;
+  document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;render()});
+  document.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{S.filter=b.dataset.f;render()});
+  bindWindow();
+  $("#mkall").onclick=()=>pickSheets();
+  $("#newjob").onclick=()=>newJob();
+  $("#rainall").onclick=()=>lostDayDialog(null);
+  const nj2=$("#newjob2");nj2&&(nj2.onclick=()=>newJob());
+  const as=$("#addsamples");as&&(as.onclick=()=>{seed().forEach(j=>S.jobs.push(j));save();render();toast("Sample jobs added")});
+  const sf=$("#supf");sf&&(sf.onchange=()=>{S.superFilter=sf.value;render()});
+  const sw=$("#sendwk");sw&&(sw.onclick=()=>sendWeek());
+  const rs=$("#reset");rs&&(rs.onclick=()=>modal('<h2>Reset sample data?</h2><p class="muted">This replaces every job on this device with the sample jobs.</p><div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn danger" id="doreset">Reset</button></div>',c=>{$("#doreset").onclick=()=>{S.jobs=seed();save();c();render();toast("Sample data restored")}}));
+  document.querySelectorAll("[data-open]").forEach(b=>b.onclick=e=>{e.stopPropagation();go("job",{jobId:b.dataset.open})});
+  document.querySelectorAll("[data-sheet]").forEach(b=>b.onclick=e=>{e.stopPropagation();go("sheets",{sheetIds:[b.dataset.sheet]})});
+  document.querySelectorAll("[data-exp]").forEach(b=>b.onclick=e=>{e.stopPropagation();S.open[b.dataset.exp]=!S.open[b.dataset.exp];render()});
+  document.querySelectorAll("tr.jobrow td.d, tr.taskrow td.d").forEach(td=>td.onclick=()=>go("job",{jobId:td.parentNode.dataset.job}));
+}
+function ganttHTML(js,ds){
+  let h='<div class="scroller"><table class="grid"><thead>'+monthHeader(ds,1)+'<tr class="dy"><th class="stick g-job" style="text-align:left">Job</th>'+dayHeads(ds)+'</tr></thead><tbody>';
+  if(!js.length)h+='<tr><td class="stick" colspan="'+(ds.length+1)+'" style="padding:16px">No jobs in this filter.</td></tr>';
+  js.forEach(j=>{const L=labels(j),open=!!S.open[j.id];const tasks=j.tasks.filter(t=>!t.sec);
+    h+='<tr class="jobrow" data-job="'+j.id+'"><th class="stick g-job" style="text-align:left"><div class="nm"><span class="dot" style="background:'+j.color+'"></span>'+esc(j.name)+'</div>'+
+      '<div class="sub"><span class="num">'+esc(j.number)+'</span><span class="pill'+(j.mode==="res"?" res":"")+'">'+L.kind+'</span>'+(S.me&&S.me.isAdmin&&superName(j.superId)?'<span>'+esc(superName(j.superId))+'</span>':'')+(sentThisWeek(j)?'<span class="sent">✓ SENT</span>':'')+'</div>'+
+      '<div class="acts"><button class="btn sm" data-open="'+j.id+'">Edit</button><button class="btn sm" data-sheet="'+j.id+'">Sheet</button><button class="btn sm ghost" data-exp="'+j.id+'" aria-expanded="'+open+'">'+(open?"Hide tasks":"Show "+tasks.length+" tasks")+'</button></div></th>';
+    ds.forEach(d=>{let b=0,r=0;tasks.forEach(t=>{const v=t.cells[d];if(v==="B")b++;else if(v==="R")r++});const n=b+r;
+      h+='<td class="d sum'+(r?" sr":n?" sb":"")+(isWE(d)?" we":"")+(dow(d)===1?" wk":"")+(d===TODAY?" today":"")+'" title="'+esc(j.name)+" · "+fmtLong(d)+": "+n+' task(s)">'+(n?'<i></i>'+(n>1?'<em>'+n+'</em>':''):"")+'</td>'});
+    h+='</tr>';
+    if(open)tasks.forEach(t=>{h+='<tr class="taskrow" data-job="'+j.id+'"><th class="stick" title="'+esc(t.name)+'">'+esc(t.name)+'</th>';
+      ds.forEach(d=>{const v=t.cells[d];h+='<td class="d'+(v==="B"?" b":v==="R"?" r":"")+(isWE(d)&&!v?" we":"")+(dow(d)===1?" wk":"")+(d===TODAY?" today":"")+'"></td>'});h+='</tr>'});
+  });
+  return h+'</tbody></table></div><p class="hint" style="margin-top:8px">Each bar shows the days a job has work scheduled; the number is how many tasks run that day. Red means something critical is due. Tap a row to edit that job.</p>';
+}
+function dayItems(js,d){const out=[];js.forEach(j=>j.tasks.forEach(t=>{const v=t.cells&&t.cells[d];if(v)out.push({j,t,v})}));out.sort((a,b)=>(a.v===b.v?0:a.v==="R"?-1:1));return out}
+function weekHTML(js){const ds=[];for(let i=0;i<7;i++){const d=add(S.start,i);if(S.hideWE&&isWE(d))continue;ds.push(d)}
+  let h='<p class="hint">Week of '+fmtLong(S.start)+'. Use “Week ›” to look ahead.</p><div class="scroller" style="border:0;background:none"><div class="week" style="--cols:'+ds.length+'">';
+  ds.forEach(d=>{const items=dayItems(js,d);
+    h+='<section class="daycol'+(d===TODAY?" today":"")+(isWE(d)?" we":"")+'"><h3>'+DOW[dow(d)]+' <span class="num muted" style="font-size:15px">'+fmt(d)+'</span></h3>';
+    if(!items.length)h+='<div class="empty">Nothing scheduled</div>';
+    items.forEach(({j,t,v})=>{h+='<button class="chip" style="--c:'+j.color+'" data-open="'+j.id+'"><div class="j">'+esc(j.name)+'</div><div class="t"><i class="sw '+(v==="R"?"r":"b")+'"></i><span>'+esc(t.name)+'</span></div></button>'});
+    h+='</section>'});
+  return h+'</div></div>'}
+function todayHTML(js){const tm=addWork(TODAY,1,false);
+  let h='<p class="hint">'+fmtLong(TODAY)+'. Critical items first, then what starts next workday ('+fmtLong(tm)+').</p><div class="cards">';
+  js.forEach(j=>{const now=dayItems([j],TODAY),next=j.tasks.filter(t=>!t.sec&&tStart(t)===tm);
+    h+='<article class="card"><div class="row"><span class="dot" style="background:'+j.color+'"></span><h3 style="font-size:19px">'+esc(j.name)+'</h3><span class="spacer"></span><button class="btn sm" data-sheet="'+j.id+'">Sheet</button><button class="btn sm" data-open="'+j.id+'">Edit</button></div>';
+    h+='<div class="eyebrow">Today</div>'+(now.length?'<ul>'+now.map(({t,v})=>'<li><i class="sw '+(v==="R"?"r":"b")+'"></i>'+esc(t.name)+' <span class="muted">· '+esc(t.res||"")+'</span></li>').join("")+'</ul>':'<div class="empty">No work scheduled today</div>');
+    h+='<div class="eyebrow">Starting next</div>'+(next.length?'<ul>'+next.map(t=>'<li><i class="sw"></i>'+esc(t.name)+' <span class="muted">· '+esc(t.res||"")+'</span></li>').join("")+'</ul>':'<div class="empty">Nothing new starts</div>')+'</article>'});
+  return h+'</div>'}
+
+/* ---------- Job editor ---------- */
+function renderJob(){
+  const j=curJob();if(!j){go("dash");return}S.jobId=j.id;const L=labels(j),ds=days();
+  let h='<div class="row"><div><div class="eyebrow">'+L.kind+' look-ahead</div><h1>'+esc(j.name||"Untitled job")+'</h1></div><span class="spacer"></span>'+
+    '<select id="jobpick" aria-label="Switch job">'+S.jobs.map(x=>'<option value="'+x.id+'"'+(x.id===j.id?" selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select>'+
+    '<button class="btn" id="lost">Lost day…</button><button class="btn primary" id="sheet1">Look-ahead sheet</button></div>'+
+    '<div class="panel jobhead">'+
+    field("Job #","number",j.number)+field(j.mode==="com"?"Project":"Name / address","name",j.name)+field(L.cm,"cm",j.cm)+field("Super","sup",j.sup)+
+    '<div class="field"><span>Type</span><div class="seg" role="group" aria-label="Job type"><button data-mode="res" aria-pressed="'+(j.mode==="res")+'">Restoration</button><button data-mode="com" aria-pressed="'+(j.mode==="com")+'">Commercial</button></div></div>'+
+    '<div class="field"><span>Crew works weekends</span><label class="chk"><input type="checkbox" id="wkend"'+(j.weekends?" checked":"")+'> Count Sat and Sun as workdays</label></div></div>'+
+    '<div class="toolbar">'+windowBar()+'<span class="spacer"></span>'+
+    '<div class="seg" role="group" aria-label="How tapping a day works">'+[["cycle","Tap to cycle"],["B",'<i class="sw b"></i>Paint blue'],["R",'<i class="sw r"></i>Paint red'],["",'Erase']].map(([v,l])=>'<button data-brush="'+v+'" aria-pressed="'+(S.brush===v)+'">'+l+'</button>').join("")+'</div></div>'+
+    '<p class="hint" style="margin:-4px 0 10px">'+(S.brush==="cycle"?"Tap a day to cycle blank → blue → red → blank.":"Drag across days to paint them. Switch back to “Tap to cycle” to scroll the grid by touch.")+' Start and End fill in on their own. When a task runs long, tasks set to start after it move out automatically.</p>';
+  const lc=6;
+  h+='<div class="scroller"><table class="grid'+(S.brush!=="cycle"?" paint":"")+'" id="grid"><thead>'+monthHeader(ds,lc,'<th class="stick" colspan="2"></th><th colspan="4"></th>')+
+    '<tr class="dy"><th class="stick c-id">'+L.id+'</th><th class="stick c-task" style="text-align:left;padding-left:8px">'+L.task+'</th><th class="c-res" style="text-align:left;padding-left:8px">'+L.res+'</th><th class="c-dt">Start</th><th class="c-dt">End</th><th class="c-act"></th>'+dayHeads(ds)+'</tr></thead><tbody>';
+  let n=0;
+  j.tasks.forEach(t=>{
+    if(t.sec){h+='<tr class="sec" data-t="'+t.id+'"><td class="stick c-id"></td><td class="stick c-task"><input class="cell" data-f="name" value="'+esc(t.name)+'" aria-label="Section name"></td><td colspan="3"></td><td class="c-act"><button class="iconbtn" data-menu="'+t.id+'" aria-label="Section options">⋯</button></td><td class="secfill" colspan="'+ds.length+'"></td></tr>';return}
+    n++;const pr=t.after&&j.tasks.find(x=>x.id===t.after);
+    h+='<tr data-t="'+t.id+'"><td class="stick c-id">'+n+'</td><td class="stick c-task"><input class="cell" data-f="name" value="'+esc(t.name)+'" placeholder="New task" aria-label="Task name">'+(pr?'<span class="dep">after '+esc(pr.name)+'</span>':'')+'</td>'+
+      '<td class="c-res"><input class="cell" data-f="res" value="'+esc(t.res||"")+'" aria-label="'+L.res+'"></td><td class="c-dt" data-s>'+fmt(tStart(t))+'</td><td class="c-dt" data-e>'+fmt(tEnd(t))+'</td>'+
+      '<td class="c-act"><button class="iconbtn" data-menu="'+t.id+'" aria-label="Task options">⋯</button></td>';
+    ds.forEach(d=>{const v=t.cells[d];h+='<td class="d'+(v==="B"?" b":v==="R"?" r":"")+(isWE(d)?" we":"")+(dow(d)===1?" wk":"")+(d===TODAY?" today":"")+'" data-d="'+d+'" aria-label="'+esc(t.name)+" "+fmtLong(d)+'"></td>'});
+    h+='</tr>'});
+  h+='</tbody></table></div><div class="row" style="margin-top:12px"><button class="btn" id="addtask">+ Task</button><button class="btn" id="addsec">+ Section</button><span class="spacer"></span><div class="legend"><span><i class="sw b"></i>Scheduled work</span><span><i class="sw r"></i>Critical</span></div><button class="btn ghost sm danger" id="deljob">Delete job</button></div>';
+  $("#app").innerHTML=h;bindJob(j);
+}
+function field(label,key,val){return '<label class="field"><span>'+label+'</span><input type="text" data-jf="'+key+'" value="'+esc(val)+'"></label>'}
+function cycle(v){return v==="B"?"R":v==="R"?"":"B"}
+function bindJob(j){
+  bindWindow();
+  $("#jobpick").onchange=e=>go("job",{jobId:e.target.value});
+  $("#sheet1").onclick=()=>go("sheets",{sheetIds:[j.id]});
+  $("#lost").onclick=()=>lostDayDialog(j);
+  document.querySelectorAll("[data-jf]").forEach(i=>i.onchange=()=>{j[i.dataset.jf]=i.value;j.example=false;save();if(i.dataset.jf==="name")$("h1").textContent=i.value});
+  document.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{j.mode=b.dataset.mode;save();render()});
+  $("#wkend").onchange=e=>{j.weekends=e.target.checked;save()};
+  document.querySelectorAll("[data-brush]").forEach(b=>b.onclick=()=>{S.brush=b.dataset.brush;render()});
+  $("#addtask").onclick=()=>{j.tasks.push({id:uid(),name:"",res:"",after:null,cells:{}});save();render();const ins=document.querySelectorAll('#grid input[data-f="name"]');ins[ins.length-1].focus()};
+  $("#addsec").onclick=()=>{j.tasks.push({id:uid(),name:"New section",sec:true,cells:{}});save();render()};
+  $("#deljob").onclick=()=>modal('<h2>Delete '+esc(j.name)+'?</h2><p class="muted">This removes the job from your list. Its history stays on the server.</p><div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn danger" id="dodel">Delete job</button></div>',c=>{$("#dodel").onclick=()=>{S.jobs=S.jobs.filter(x=>x.id!==j.id);if(!S.demo&&S.synced[j.id]!==undefined)S.archived.push(j.id);delete S.synced[j.id];save();c();go("dash");toast("Job deleted")}});
+  const grid=$("#grid");
+  grid.addEventListener("change",e=>{const i=e.target.closest("input.cell");if(!i)return;const t=j.tasks.find(x=>x.id===i.closest("tr").dataset.t);t[i.dataset.f]=i.value;j.example=false;save()});
+  grid.addEventListener("click",e=>{const m=e.target.closest("[data-menu]");if(m){taskMenu(j,j.tasks.find(x=>x.id===m.dataset.menu));return}
+    const td=e.target.closest("td.d");if(!td||S.brush!=="cycle")return;const t=j.tasks.find(x=>x.id===td.parentNode.dataset.t);
+    const nv=cycle(t.cells[td.dataset.d]);setCell(t,td,nv);after(j,td.parentNode,t)});
+  let painting=null;
+  grid.addEventListener("pointerdown",e=>{if(S.brush==="cycle")return;const td=e.target.closest("td.d");if(!td)return;e.preventDefault();painting={tr:td.parentNode,t:j.tasks.find(x=>x.id===td.parentNode.dataset.t)};setCell(painting.t,td,S.brush)});
+  grid.addEventListener("pointermove",e=>{if(!painting)return;const el=document.elementFromPoint(e.clientX,e.clientY);const td=el&&el.closest&&el.closest("td.d");if(td&&td.parentNode===painting.tr)setCell(painting.t,td,S.brush)});
+  const end=()=>{if(!painting)return;const pt=painting;painting=null;after(j,pt.tr,pt.t)};
+  window.onpointerup=end;window.onpointercancel=end;
+}
+function setCell(t,td,v){const d=td.dataset.d;if(v)t.cells[d]=v;else delete t.cells[d];td.classList.toggle("b",v==="B");td.classList.toggle("r",v==="R")}
+function after(j,tr,t){j.example=false;tr.querySelector("[data-s]").textContent=fmt(tStart(t));tr.querySelector("[data-e]").textContent=fmt(tEnd(t));
+  const moved=reflow(j);save();if(moved){render();toast(moved===1?"Moved 1 later task to keep the order":"Moved "+moved+" later tasks to keep the order")}}
+
+function taskMenu(j,t){
+  const opts=j.tasks.filter(x=>!x.sec&&x.id!==t.id&&!isAncestor(j,x,t)).map(x=>'<option value="'+x.id+'"'+(x.id===t.after?" selected":"")+'>'+esc(x.name||"Untitled")+'</option>').join("");
+  const deps=dependents(j,t).length;
+  modal('<div class="eyebrow">'+(t.sec?"Section":"Task")+'</div><h2>'+esc(t.name||"Untitled")+'</h2>'+
+    (t.sec?'':'<label class="field"><span>Starts after</span><select id="m-after"><option value="">Nothing (free task)</option>'+opts+'</select></label>'+
+    '<div class="field"><span>Move this task</span><div class="row"><button class="btn" data-sh="-1">← 1 workday earlier</button><button class="btn" data-sh="1">1 workday later →</button></div>'+
+    '<label class="chk"><input type="checkbox" id="m-deps" checked> Also move the '+deps+' task'+(deps===1?"":"s")+' that start after it</label></div>')+
+    '<div class="field"><span>Order</span><div class="row"><button class="btn" data-mv="-1">Move up</button><button class="btn" data-mv="1">Move down</button></div></div>'+
+    '<div class="row"><button class="btn danger" id="m-del">Delete</button><span class="spacer"></span><button class="btn primary" data-close>Done</button></div>',
+  close=>{
+    const a=$("#m-after");a&&(a.onchange=()=>{t.after=a.value||null;const moved=reflow(j);save();render();if(moved)toast("Moved "+moved+" task"+(moved>1?"s":"")+" to start after "+(j.tasks.find(x=>x.id===t.after)||{}).name)});
+    document.querySelectorAll("[data-sh]").forEach(b=>b.onclick=()=>{const n=+b.dataset.sh;if($("#m-deps").checked)shiftWithDeps(j,t,n);else shiftTask(j,t,n);reflow(j);save();render();toast(n>0?"Moved later":"Moved earlier")});
+    document.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>{const i=j.tasks.indexOf(t),n=i+(+b.dataset.mv);if(n<0||n>=j.tasks.length)return;j.tasks.splice(i,1);j.tasks.splice(n,0,t);save();render()});
+    $("#m-del").onclick=()=>{j.tasks.forEach(x=>{if(x.after===t.id)x.after=t.after||null});j.tasks=j.tasks.filter(x=>x!==t);save();close();render();toast("Deleted")};
+  })}
+
+function lostDayDialog(j){
+  const scope=j?'<p class="muted">Every task on <b>'+esc(j.name)+'</b> from this day forward moves one workday later.</p>':
+    '<p class="muted">Rain day or shutdown? Pick the jobs it hits. Their work from this day forward moves one workday later.</p><div class="field"><span>Jobs</span>'+S.jobs.map(x=>'<label class="chk"><input type="checkbox" class="lj" value="'+x.id+'" checked> '+esc(x.name)+'</label>').join("")+'</div>';
+  modal('<h2>Lost day</h2>'+scope+'<label class="field"><span>Day lost</span><input type="date" id="ld" value="'+TODAY+'"></label><div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="ldgo">Push schedule</button></div>',
+  close=>{$("#ldgo").onclick=()=>{const d=$("#ld").value||TODAY;const list=j?[j]:[...document.querySelectorAll(".lj:checked")].map(i=>job(i.value));let n=0;list.forEach(x=>{n+=lostDay(x,d);x.example=false});save();close();render();toast("Pushed "+n+" task"+(n===1?"":"s")+" on "+list.length+" job"+(list.length===1?"":"s"))}})}
+
+function newJob(){
+  modal('<h2>New job</h2><label class="field"><span>Job #</span><input type="text" id="nj-num" placeholder="24-160 RCN"></label><label class="field"><span>Name / address</span><input type="text" id="nj-name" placeholder="55 Elm St, Stockton"></label>'+
+    '<div class="field"><span>Type</span><div class="seg" role="group"><button data-nm="res" aria-pressed="true">Restoration</button><button data-nm="com" aria-pressed="false">Commercial</button></div></div>'+
+    '<div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="nj-go">Create job</button></div>',
+  close=>{let mode="res";document.querySelectorAll("[data-nm]").forEach(b=>b.onclick=()=>{mode=b.dataset.nm;document.querySelectorAll("[data-nm]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
+    $("#nj-go").onclick=()=>{const name=$("#nj-name").value.trim()||"New job";const j={id:uid(),name,number:$("#nj-num").value.trim(),mode,cm:"",sup:SUPNAME(),color:JOBCOLORS[S.jobs.length%JOBCOLORS.length],weekends:false,
+      tasks:mode==="com"?[{id:uid(),name:"Submittals",sec:true,cells:{}},{id:uid(),name:"",res:"",after:null,cells:{}}]:[{id:uid(),name:"",res:"",after:null,cells:{}}]};
+      S.jobs.push(j);save();close();go("job",{jobId:j.id})}})}
+
+/* ---------- Look-ahead sheets ---------- */
+function pickSheets(){
+  modal('<h2>Create look-ahead sheets</h2><p class="muted">One sheet per job for '+rangeLabel()+'.</p><div class="field"><span>Jobs</span>'+visibleJobs().map(x=>'<label class="chk"><input type="checkbox" class="sj" value="'+x.id+'" checked> '+esc(x.name)+'</label>').join("")+'</div>'+
+    '<div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="sjgo">Create sheets</button></div>',
+  close=>{$("#sjgo").onclick=()=>{const ids=[...document.querySelectorAll(".sj:checked")].map(i=>i.value);close();go("sheets",{sheetIds:ids})}})}
+function renderSheets(){
+  const ids=(S.sheetIds&&S.sheetIds.length?S.sheetIds:S.jobs.map(j=>j.id)).filter(job);const ds=days();
+  let h='<div class="noprint"><div class="row"><div><div class="eyebrow">'+ids.length+' sheet'+(ids.length===1?"":"s")+' · '+rangeLabel()+'</div><h1>Look-ahead sheets</h1></div><span class="spacer"></span><button class="btn" id="back">← All jobs</button><button class="btn" id="pick">Choose jobs…</button><button class="btn primary" id="print">Print / Save PDF</button></div>'+
+    '<div class="toolbar">'+windowBar()+'</div><p class="hint">Each job prints on its own letter-landscape page. On iPad, Print opens the share sheet where you can print or save a PDF.</p></div><div class="sheets">';
+  ids.forEach((id,i)=>h+='<div class="sheetwrap">'+sheetHTML(job(id),ds,i+1,ids.length)+'</div>');
+  $("#app").innerHTML=h+'</div>';bindWindow();$("#back").onclick=()=>go("dash");$("#pick").onclick=()=>pickSheets();$("#print").onclick=()=>window.print();
+}
+function sheetHTML(j,ds,i,n){
+  const L=labels(j);const W=Math.max(16,Math.min(26,Math.floor(560/ds.length)));
+  let h='<article class="sheet"><div class="sh-top"><div class="sh-logo">'+LOGO+'<div><b>HAGGERTY</b><small>ADVISE. BUILD. RESTORE. MAINTAIN.</small></div></div>'+
+    '<div class="sh-title"><h2>'+S.weeks+'-Week Look-Ahead</h2><div>'+rangeLabel()+'</div></div></div>'+
+    '<div class="sh-meta"><div><span>Job #</span>'+esc(j.number)+'</div><div><span>'+(j.mode==="com"?"Project":"Name")+'</span>'+esc(j.name)+'</div><div><span>'+L.cm+'</span>'+esc(j.cm)+'</div><div><span>Super</span>'+esc(j.sup)+'</div></div>'+
+    '<table><colgroup><col style="width:34px"><col><col style="width:120px"><col style="width:58px"><col style="width:58px">'+ds.map(()=>'<col style="width:'+W+'px">').join("")+'</colgroup><thead>';
+  let mo='<tr><th colspan="5"></th>',x=0;while(x<ds.length){const m=p(ds[x]).getMonth();let c=0;while(x+c<ds.length&&p(ds[x+c]).getMonth()===m)c++;mo+='<th colspan="'+c+'" style="text-align:left">'+(c>2?MO[m].toUpperCase():"")+'</th>';x+=c}
+  h+=mo+'</tr><tr><th>'+L.id+'</th><th style="text-align:left">'+L.task+'</th><th style="text-align:left">'+L.res+'</th><th>Start</th><th>End</th>'+ds.map(d=>'<th class="d'+(isWE(d)?" we":"")+(d===TODAY?" tdy":"")+'">'+DOW[dow(d)][0]+'<br>'+p(d).getDate()+'</th>').join("")+'</tr></thead><tbody>';
+  let k2=0;j.tasks.forEach(t=>{if(t.sec){h+='<tr class="sec"><td></td><td colspan="'+(4+ds.length)+'">'+esc(t.name)+'</td></tr>';return}k2++;
+    h+='<tr><td style="text-align:center">'+k2+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.res||"")+'</td><td style="text-align:center">'+fmt(tStart(t))+'</td><td style="text-align:center">'+fmt(tEnd(t))+'</td>'+
+      ds.map(d=>{const v=t.cells[d];return '<td class="d'+(v==="B"?" b":v==="R"?" r":isWE(d)?" we":"")+'"></td>'}).join("")+'</tr>'});
+  for(let e=0;e<Math.max(0,4-k2);e++)h+='<tr><td></td><td></td><td></td><td></td><td></td>'+ds.map(d=>'<td class="d'+(isWE(d)?" we":"")+'"></td>').join("")+'</tr>';
+  h+='</tbody></table><div class="sh-foot"><div class="lg"><span><i style="background:#1764F4"></i>Scheduled work</span><span><i style="background:#E0262B"></i>Critical: inspection, delivery, deadline</span></div><div>Prepared '+fmtLong(TODAY)+' · Sheet '+i+' of '+n+'</div></div></article>';
+  return h}
+
+/* ---------- router ---------- */
+const weekStart=()=>mondayOf(TODAY);
+function sentThisWeek(j){return j.lastSubmitted&&j.lastSubmitted.slice(0,10)>=weekStart()}
+function sendWeek(){
+  const js=visibleJobs();
+  modal('<h2>Send this week’s look-aheads</h2><p class="muted">Sends a copy of each job’s current look-ahead for the week of '+fmtLong(weekStart())+'. You can keep editing afterward and send again.</p><div class="field"><span>Jobs</span>'+js.map(x=>'<label class="chk"><input type="checkbox" class="wk2" value="'+x.id+'" checked> '+esc(x.name)+(sentThisWeek(x)?' <span class="sent">✓ SENT</span>':'')+'</label>').join("")+'</div>'+
+    '<div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="wkgo">Send</button></div>',
+  close=>{$("#wkgo").onclick=async()=>{const ids=[...document.querySelectorAll(".wk2:checked")].map(i=>i.value);if(!ids.length)return;
+    $("#wkgo").disabled=true;$("#wkgo").textContent="Sending…";
+    try{clearTimeout(syncTimer);await syncNow();if(pending())throw new Error("Some changes haven’t saved yet. Check your connection and try again.");
+      const n=await rpc("la_submit",{p_code:S.code,p_job_ids:ids,p_week_start:weekStart()});const now=new Date().toISOString();
+      S.jobs.forEach(j=>{if(ids.includes(j.id))j.lastSubmitted=now});persist();close();render();toast("Sent "+n+" look-ahead"+(n===1?"":"s"))}
+    catch(e){$("#wkgo").disabled=false;$("#wkgo").textContent="Send";toast(e.message)}}})}
+
+async function renderTeam(){
+  if(!S.me||!S.me.isAdmin){go("dash");return}
+  $("#app").innerHTML='<div class="row"><div><div class="eyebrow">Admin</div><h1>Team</h1></div><span class="spacer"></span><button class="btn primary" id="addsup">+ Add super</button></div><p class="muted">Loading…</p>';
+  $("#addsup").onclick=addSuper;
+  let rep=[];try{const d=await rpc("la_get_jobs",{p_code:S.code});S.supers=d.supers||[];rep=await rpc("la_week_report",{p_code:S.code,p_week_start:weekStart()})||[]}catch(e){toast(e.message)}
+  if(S.view!=="team")return;
+  const sent=rep.filter(r=>r.submittedAt).length;
+  let h='<div class="row"><div><div class="eyebrow">Admin</div><h1>Team</h1></div><span class="spacer"></span><button class="btn primary" id="addsup">+ Add super</button></div>'+
+    '<h2 style="margin-top:18px">Week of '+fmtLong(weekStart())+'</h2><p class="muted">'+sent+' of '+rep.length+' jobs sent this week.</p>'+
+    '<div class="scroller"><table class="plain"><thead><tr><th>Super</th><th>Job</th><th>Job #</th><th>Sent</th></tr></thead><tbody>'+
+    (rep.length?rep.map(r=>'<tr><td>'+esc(r.super)+'</td><td>'+esc(r.job)+'</td><td class="num">'+esc(r.number)+'</td><td>'+(r.submittedAt?'<span class="sent">✓ '+esc(new Date(r.submittedAt).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"}))+'</span>':'<span class="muted">Not yet</span>')+'</td></tr>').join(""):'<tr><td colspan="4" class="muted">No jobs yet.</td></tr>')+'</tbody></table></div>'+
+    '<h2 style="margin-top:22px">Supers</h2><div class="scroller"><table class="plain"><thead><tr><th>Name</th><th>Role</th><th>Last opened the app</th></tr></thead><tbody>'+
+    S.supers.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+(x.isAdmin?"Admin":"Super")+'</td><td>'+(x.lastSeen?esc(new Date(x.lastSeen).toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})):'<span class="muted">Never</span>')+'</td></tr>').join("")+'</tbody></table></div>';
+  $("#app").innerHTML=h;$("#addsup").onclick=addSuper}
+function addSuper(){
+  modal('<h2>Add a super</h2><label class="field"><span>Name</span><input type="text" id="as-name" placeholder="First and last name"></label><label class="chk"><input type="checkbox" id="as-admin"> Admin (sees every super’s jobs)</label>'+
+    '<div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="as-go">Create access code</button></div>',
+  close=>{$("#as-go").onclick=async()=>{const name=$("#as-name").value.trim();if(!name){$("#as-name").focus();return}
+    try{const code=await rpc("la_add_super",{p_code:S.code,p_name:name,p_is_admin:$("#as-admin").checked});
+      modal('<h2>'+esc(name)+'’s access code</h2><div class="code">'+esc(code)+'</div><p class="muted">Send this code and the app link to '+esc(name)+'. It is shown only once. On iPad they open the link in Safari, tap Share, then Add to Home Screen.</p><div class="row"><span class="spacer"></span><button class="btn primary" data-close>Done</button></div>',
+        c2=>{document.querySelector("[data-close]").addEventListener("click",()=>{if(S.view==="team")renderTeam()})})}
+    catch(e){toast(e.message)}}})}
+
+function renderLogin(msg){
+  $("#app").innerHTML='<form class="login panel" id="lf" style="padding:24px"><div class="eyebrow">Superintendent sign-in</div><h1>3-Week Look-Ahead</h1>'+
+    '<p class="muted" style="margin:0">Enter the access code Liam sent you. You only do this once on each iPad.</p>'+
+    '<input type="text" id="code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="16" placeholder="ACCESS CODE" aria-label="Access code">'+
+    (msg?'<div class="err">'+esc(msg)+'</div>':'')+'<button class="btn primary" type="submit" style="justify-content:center">Sign in</button>'+
+    '<button class="btn ghost" type="button" id="demo" style="justify-content:center">Try it with sample jobs (not saved)</button></form>';
+  $("#lf").onsubmit=async e=>{e.preventDefault();const c=$("#code").value.trim().toUpperCase();if(!c)return;const b=$("#lf button[type=submit]");b.disabled=true;b.textContent="Signing in…";
+    try{const me=await rpc("la_login",{p_code:c});S.me=me;S.code=c;S.demo=false;ls.set(CODEKEY,c);ls.set(KEY+":me",JSON.stringify(me));await startSignedIn()}
+    catch(err){renderLogin(/access code/i.test(err.message)?"That code didn’t work. Check it and try again.":"Couldn’t reach the server. Check your connection and try again.")}};
+  $("#demo").onclick=()=>{S.demo=true;S.me={name:"Superintendent A",isAdmin:false};if(!loadCache())S.jobs=seed();chrome();go("dash")};
+  chrome();
+}
+function chrome(){
+  const inApp=!!S.me;$("#nav").hidden=!inApp;$("#who").hidden=!inApp;$("#navteam").hidden=!(S.me&&S.me.isAdmin);
+  if(inApp){$("#who").textContent=S.demo?"Demo · Sign in":S.me.name;}
+  setSync("","Saved")}
+function signOut(msg){S.me=null;S.code=null;S.demo=false;S.jobs=[];S.synced={};S.archived=[];ls.del(CODEKEY);ls.del(KEY+":me");S.view="dash";renderLogin(msg)}
+$("#who").onclick=()=>{if(S.demo){signOut();return}
+  modal('<h2>'+esc(S.me.name)+'</h2><p class="muted">'+(pending()?'Some changes haven’t reached the server yet. Signing out now would lose them.':'Everything is saved.')+'</p><div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn danger" id="so">Sign out</button></div>',c=>{$("#so").onclick=()=>{c();signOut()}})};
+async function startSignedIn(){
+  loadCache();chrome();go("dash");
+  try{await pull();render()}catch(e){if(/access code/i.test(e.message)){signOut("That access code no longer works.");return}setSync("off","Offline, showing saved copy")}
+}
+function render(){
+  document.querySelectorAll("[data-nav]").forEach(b=>b.setAttribute("aria-current",String(b.dataset.nav===S.view)));
+  if(!S.me){renderLogin();return}
+  if(S.view==="job")renderJob();else if(S.view==="sheets")renderSheets();else if(S.view==="team")renderTeam();else renderDash();
+}
+document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>go(b.dataset.nav,b.dataset.nav==="sheets"?{sheetIds:null}:{}));
+$("#home").onclick=()=>{if(S.me)go("dash")};
+loadPrefs();
+(function boot(){const c=ls.get(CODEKEY);let me=null;try{me=JSON.parse(ls.get(KEY+":me")||"null")}catch(e){}
+  if(c&&me){S.code=c;S.me=me;startSignedIn()}else renderLogin()})();
+if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js").catch(()=>{});
+})();
+</script>
+</body>
+</html>
