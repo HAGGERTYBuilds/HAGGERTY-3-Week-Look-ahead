@@ -128,6 +128,8 @@ declare
   v_id uuid := (p_job->>'id')::uuid;
   v_owner uuid;
   v_target uuid;
+  v_mode text := case when p_job->>'mode' = 'com' then 'com' else 'res' end;
+  v_div text;
   j public.la_jobs;
   t jsonb; i int := 0;
 begin
@@ -141,9 +143,12 @@ begin
     select id into v_target from public.la_supers where id = (p_job->>'superId')::uuid and active;
     if v_target is null then raise exception 'Unknown super' using errcode = '22023'; end if;
   end if;
+  -- a super tagged Restoration or Commercial sets the type of every job they run
+  select scope into v_div from public.la_supers where id = v_target;
+  if v_div in ('res','com') then v_mode := v_div; end if;
   insert into public.la_jobs as x (id, super_id, number, name, mode, cm, sup_name, color, weekends, sort, rev, updated_at)
   values (v_id, v_target, coalesce(p_job->>'number',''), coalesce(p_job->>'name',''),
-          case when p_job->>'mode' = 'com' then 'com' else 'res' end, coalesce(p_job->>'cm',''),
+          v_mode, coalesce(p_job->>'cm',''),
           coalesce(p_job->>'sup',''), coalesce(p_job->>'color','#F7943F'),
           coalesce((p_job->>'weekends')::boolean,false), coalesce((p_job->>'sort')::int,0), 1, now())
   on conflict (id) do update set super_id = excluded.super_id, number = excluded.number, name = excluded.name, mode = excluded.mode,

@@ -24,9 +24,13 @@ It blends the two existing templates:
 - Admins see every job, create, import and delete jobs, and pick the super on each job.
 - Each super gets a personal sign-in link (`…/#k=CODE`). Tapping it signs them in; the 8-letter code in it also works on the sign-in screen. Supers can't create or delete jobs, and the job header (Job #, name, PM/CM, super) is read-only for them.
 
+## Divisions
+
+Each super is tagged **Restoration**, **Commercial** or **Both** (Team › Division). A super's division sets the type of every job they run: assign a job to a restoration super and it becomes a restoration job, with no need to read job numbers or names. Supers tagged Both, and admins, set the type per job. Changing a super's division switches their jobs to match.
+
 ## Leadership overview (view only)
 
-People added as **Leader** see an Overview page and can open any job in their scope without changing it. The scope is set per person: all jobs, commercial jobs, or restoration jobs. Hugo (VP) sees all jobs, David Booth (general superintendent, commercial) sees commercial, and Eugene (general superintendent, restoration) sees restoration. Admins see the Overview too.
+People added as **Leader** see an Overview page and can open any job in their scope without changing it. The scope is set per person: all jobs, commercial, or restoration. A leader sees the jobs of their type plus every job run by a super in their division. Hugo (VP) sees all jobs, David Booth (general superintendent, commercial) sees commercial, and Eugene (general superintendent, restoration) sees restoration. Admins see the Overview too.
 
 The Overview shows active jobs, how many look-aheads were sent this week, critical items in the next 7 days, and jobs not updated in 7+ days. It also has a commercial vs restoration split (company view only), a workload grid with one row per super showing how many tasks they have running each day, the critical items coming up in the next 2 weeks, and the jobs that still need sending or updating.
 

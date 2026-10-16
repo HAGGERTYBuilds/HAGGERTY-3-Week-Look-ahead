@@ -436,6 +436,12 @@ const isViewer=()=>!S.demo&&!!(S.me&&S.me.role==="viewer");
 const canLead=()=>isAdmin()||isViewer();
 const SCOPE={all:"All jobs",com:"Commercial",res:"Restoration"};
 const crew=()=>S.supers.filter(x=>x.role!=="viewer");
+const DIV={res:"Restoration",com:"Commercial",all:"Both"};
+/* a super tagged Restoration or Commercial decides the type of every job they run */
+const divOf=id=>{const x=S.supers.find(s=>s.id===id);return x&&x.role!=="viewer"&&(x.scope==="res"||x.scope==="com")?x.scope:null};
+function followDiv(selId,attr){const e=document.getElementById(selId);if(!e)return null;
+  const apply=()=>{const d=divOf(e.value);if(!d)return;document.querySelectorAll("["+attr+"]").forEach(b=>{b.setAttribute("aria-pressed",b.getAttribute(attr)===d);if(b.getAttribute(attr)===d)b.click()})};
+  e.addEventListener("change",apply);apply()}
 const firstName=()=>((S.me&&S.me.name)||"").split(/\s+/)[0];
 const curJob=()=>job(S.jobId)||S.jobs[0];
 
@@ -603,7 +609,7 @@ function renderJob(){
     (isAdmin()?'<div class="panel jobhead">'+
     field("Job #","number",j.number)+field(j.mode==="com"?"Project":"Name / address","name",j.name)+field(L.cm,"cm",j.cm)+
     (crew().length?'<label class="field"><span>Super</span><select id="jsuper">'+(j.superId?'':'<option value="">Choose…</option>')+crew().map(x=>'<option value="'+x.id+'"'+(x.id===j.superId?" selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label>':field("Super","sup",j.sup))+
-    '<div class="field"><span>Type</span><div class="seg" role="group" aria-label="Job type"><button data-mode="res" aria-pressed="'+(j.mode==="res")+'">Restoration</button><button data-mode="com" aria-pressed="'+(j.mode==="com")+'">Commercial</button></div></div>'+
+    (divOf(j.superId)?'<div class="ro field"><span>Type</span><b>'+DIV[j.mode]+'</b><small class="hint">set by '+esc(superName(j.superId))+'’s division</small></div>':'<div class="field"><span>Type</span><div class="seg" role="group" aria-label="Job type"><button data-mode="res" aria-pressed="'+(j.mode==="res")+'">Restoration</button><button data-mode="com" aria-pressed="'+(j.mode==="com")+'">Commercial</button></div></div>')+
     '<div class="field"><span>Crew works weekends</span><label class="chk"><input type="checkbox" id="wkend"'+(j.weekends?" checked":"")+'> Count Sat and Sun as workdays</label></div></div>'
     :'<div class="panel jobhead">'+[["Job #",j.number],[j.mode==="com"?"Project":"Name / address",j.name],[L.cm,j.cm],["Super",j.sup||S.me.name]].map(([a,b])=>'<div class="ro field"><span>'+a+'</span><b>'+esc(b||"–")+'</b></div>').join("")+'</div>')+
     (isViewer()?'<p class="hint">View only. '+esc(j.sup||superName(j.superId)||"The super")+' keeps this look-ahead up to date.</p>':ls.get(KEY+":help")?'':'<div class="help" id="help"><div style="flex:1"><h3>How to update this look-ahead</h3><ol><li>Tap a day box to mark it: once for <b style="color:var(--blue)">blue</b> (work scheduled), twice for <b style="color:var(--red)">red</b> (critical: inspection, delivery, deadline), three times to clear it.</li><li>Tap <b>⋯</b> on a task to move it a day, delete it, or set what it starts after.</li><li>Rain day? Tap <b>Lost day…</b> and everything slides one workday.</li><li>Everything saves by itself, even with no signal.</li></ol></div><button class="btn sm" id="helpx">Got it</button></div>')+
@@ -631,7 +637,8 @@ function bindJob(j){
   bindWindow();
   const jp=$("#jobpick");jp&&(jp.onchange=e=>go("job",{jobId:e.target.value}));
   const hx=$("#helpx");hx&&(hx.onclick=()=>{ls.set(KEY+":help","1");$("#help").remove()});
-  const js=$("#jsuper");js&&(js.onchange=()=>{j.superId=js.value||null;j.sup=superName(j.superId);save();toast("Assigned to "+j.sup)});
+  const js=$("#jsuper");js&&(js.onchange=()=>{j.superId=js.value||null;j.sup=superName(j.superId);const d=divOf(j.superId);const ch=d&&d!==j.mode;if(d)j.mode=d;save();
+    toast("Assigned to "+j.sup+(ch?" · now "+DIV[d]:""));render()});
   $("#sheet1").onclick=()=>go("sheets",{sheetIds:[j.id]});
   const lb=$("#lost");lb&&(lb.onclick=()=>lostDayDialog(j));
   document.querySelectorAll("[data-jf]").forEach(i=>i.onchange=()=>{j[i.dataset.jf]=i.value;j.example=false;save();if(i.dataset.jf==="name")$("h1").textContent=i.value});
@@ -683,12 +690,12 @@ function newJob(){
   modal('<h2>New job</h2><label class="field"><span>Job #</span><input type="text" id="nj-num" placeholder="24-160 RCN"></label><label class="field"><span>Name / address</span><input type="text" id="nj-name" placeholder="55 Elm St, Stockton"></label>'+
     '<div class="field"><span>Type</span><div class="seg" role="group"><button data-nm="res" aria-pressed="true">Restoration</button><button data-nm="com" aria-pressed="false">Commercial</button></div></div>'+superPick("nj-sup",null)+
     '<div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="nj-go">Create job</button></div>',
-  close=>{let mode="res";document.querySelectorAll("[data-nm]").forEach(b=>b.onclick=()=>{mode=b.dataset.nm;document.querySelectorAll("[data-nm]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
+  close=>{let mode="res";document.querySelectorAll("[data-nm]").forEach(b=>b.onclick=()=>{mode=b.dataset.nm;document.querySelectorAll("[data-nm]").forEach(x=>x.setAttribute("aria-pressed",x===b))});followDiv("nj-sup","data-nm");
     $("#nj-go").onclick=()=>{const name=$("#nj-name").value.trim()||"New job";const sid=pickedSuper("nj-sup");const j={id:uid(),superId:sid,name,number:$("#nj-num").value.trim(),mode,cm:"",sup:sid?superName(sid):SUPNAME(),color:JOBCOLORS[S.jobs.length%JOBCOLORS.length],weekends:false,
       tasks:mode==="com"?[{id:uid(),name:"Submittals",sec:true,cells:{}},{id:uid(),name:"",res:"",after:null,cells:{}}]:[{id:uid(),name:"",res:"",after:null,cells:{}}]};
       S.jobs.push(j);save();close();go("job",{jobId:j.id})}})}
 
-function superPick(id,sel){if(!crew().length)return "";return '<label class="field"><span>Super on this job</span><select id="'+id+'">'+crew().map(x=>'<option value="'+x.id+'"'+(x.id===(sel||(S.me&&S.me.id))?" selected":"")+'>'+esc(x.name)+(x.isAdmin?" (admin)":"")+'</option>').join("")+'</select></label>'}
+function superPick(id,sel){if(!crew().length)return "";return '<label class="field"><span>Super on this job</span><select id="'+id+'">'+crew().map(x=>'<option value="'+x.id+'"'+(x.id===(sel||(S.me&&S.me.id))?" selected":"")+'>'+esc(x.name)+(divOf(x.id)?" · "+DIV[divOf(x.id)]:x.isAdmin?" (admin)":"")+'</option>').join("")+'</select></label>'}
 function pickedSuper(id){const e=document.getElementById(id);return e&&e.value||null}
 
 /* ---------- Import an existing schedule ----------
@@ -841,7 +848,7 @@ function importPreview(r){
     (r.kind==="list"||b0.tasks.length!==buildImport(r,false).tasks.length?'<label class="chk"><input type="checkbox" id="im-skip" checked> Leave out tasks that are already finished</label>':'')+
     '<div class="imsum" id="im-sum">'+sumHTML(b0)+'</div>'+
     '<div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="im-go">Create job</button></div>',
-  close=>{document.querySelectorAll("[data-im]").forEach(b=>b.onclick=()=>{mode=b.dataset.im;document.querySelectorAll("[data-im]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
+  close=>{document.querySelectorAll("[data-im]").forEach(b=>b.onclick=()=>{mode=b.dataset.im;document.querySelectorAll("[data-im]").forEach(x=>x.setAttribute("aria-pressed",x===b))});followDiv("im-sup","data-im");
     const sk=$("#im-skip");sk&&(sk.onchange=()=>{skip=sk.checked;$("#im-sum").innerHTML=sumHTML(buildImport(r,skip))});
     $("#im-go").onclick=()=>{const b=buildImport(r,skip);if(!b.tasks.some(t=>!t.sec&&tStart(t))){toast("Nothing to import. Untick “Leave out finished tasks” to bring in the whole schedule.");return}
       const sid=pickedSuper("im-sup");
@@ -918,9 +925,15 @@ async function renderTeam(){
     '<h2 style="margin-top:18px">Week of '+fmtLong(weekStart())+'</h2><p class="muted">'+sent+' of '+rep.length+' jobs sent this week.</p>'+
     '<div class="scroller"><table class="plain"><thead><tr><th>Super</th><th>Job</th><th>Job #</th><th>Sent</th></tr></thead><tbody>'+
     (rep.length?rep.map(r=>'<tr><td>'+esc(r.super)+'</td><td>'+esc(r.job)+'</td><td class="num">'+esc(r.number)+'</td><td>'+(r.submittedAt?'<span class="sent">✓ '+esc(new Date(r.submittedAt).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"}))+'</span>':'<span class="muted">Not yet</span>')+'</td></tr>').join(""):'<tr><td colspan="4" class="muted">No jobs yet.</td></tr>')+'</tbody></table></div>'+
-    '<h2 style="margin-top:22px">People</h2><p class="muted">Each person gets a personal link. Opening it signs them straight in. Supers only see the jobs assigned to them; leaders get a view-only overview of their jobs.</p><div class="scroller"><table class="plain"><thead><tr><th>Name</th><th>Role</th><th>Jobs</th><th>Last opened the app</th><th></th></tr></thead><tbody>'+
-    S.supers.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+(x.isAdmin?"Admin":x.role==="viewer"?"View only · "+SCOPE[x.scope||"all"]:"Super")+'</td><td class="num">'+(x.role==="viewer"?"–":S.jobs.filter(j=>j.superId===x.id).length)+'</td><td>'+(x.lastSeen?esc(new Date(x.lastSeen).toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})):'<span class="muted">Never</span>')+'</td><td><button class="btn sm" data-relink="'+x.id+'">New sign-in link</button></td></tr>').join("")+'</tbody></table></div>';
+    '<h2 style="margin-top:22px">People</h2><p class="muted">Each person gets a personal link. Opening it signs them straight in. Supers only see the jobs assigned to them, and a super’s division (Restoration or Commercial) sets the type of every job they run. Leaders get a view-only overview of their division.</p><div class="scroller"><table class="plain"><thead><tr><th>Name</th><th>Role</th><th>Division</th><th>Jobs</th><th>Last opened the app</th><th></th></tr></thead><tbody>'+
+    S.supers.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+(x.isAdmin?"Admin":x.role==="viewer"?"Leader (view only)":"Super")+'</td><td>'+(x.isAdmin?'<span class="muted">All jobs</span>':
+      '<select data-scope="'+x.id+'" aria-label="'+(x.role==="viewer"?"Which jobs "+esc(x.name)+" sees":esc(x.name)+"’s division")+'">'+(x.role==="viewer"?[["all","All jobs"],["com","Commercial"],["res","Restoration"]]:[["res","Restoration"],["com","Commercial"],["all","Both"]]).map(([v,l])=>'<option value="'+v+'"'+((x.scope||"all")===v?" selected":"")+'>'+l+'</option>').join("")+'</select>')+'</td><td class="num">'+(x.role==="viewer"?"–":S.jobs.filter(j=>j.superId===x.id).length)+'</td><td>'+(x.lastSeen?esc(new Date(x.lastSeen).toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})):'<span class="muted">Never</span>')+'</td><td><button class="btn sm" data-relink="'+x.id+'">New sign-in link</button></td></tr>').join("")+'</tbody></table></div>';
   $("#app").innerHTML=h;$("#addsup").onclick=addSuper;
+  document.querySelectorAll("[data-scope]").forEach(sel=>sel.onchange=async()=>{const x=S.supers.find(s=>s.id===sel.dataset.scope);
+    try{await rpc("la_set_scope",{p_code:S.code,p_super_id:x.id,p_scope:sel.value});x.scope=sel.value;
+      const n=x.role!=="viewer"&&sel.value!=="all"?S.jobs.filter(j=>j.superId===x.id&&j.mode!==sel.value).length:0;
+      await pull();toast(x.name+": "+(x.role==="viewer"?"sees "+SCOPE[sel.value].toLowerCase():DIV[sel.value])+(n?" · "+n+" job"+(n>1?"s":"")+" switched":""))}
+    catch(e){toast(e.message);renderTeam()}});
   document.querySelectorAll("[data-relink]").forEach(b=>b.onclick=()=>{const x=S.supers.find(s=>s.id===b.dataset.relink);
     modal('<h2>New sign-in link for '+esc(x.name)+'?</h2><p class="muted">'+(x.id===S.me.id?"Your current link and code stop working, and this iPad switches to the new one.":"Their old link and code stop working. Use this if they lost it or it was shared with the wrong person. They’ll need the new link on each device.")+'</p><div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="rl-go">Make new link</button></div>',
       ()=>{$("#rl-go").onclick=async()=>{try{const code=await rpc("la_reset_code",{p_code:S.code,p_super_id:x.id});if(x.id===S.me.id){S.code=code;ls.set(CODEKEY,code);setLinkHash(code)}showLink(x.name,code)}catch(e){toast(e.message)}}})})}
@@ -935,11 +948,13 @@ function showLink(name,code){const link=signLink(code);
 function addSuper(){
   modal('<h2>Add a person</h2><label class="field"><span>Name</span><input type="text" id="as-name" placeholder="First and last name"></label>'+
     '<label class="field"><span>What they do here</span><select id="as-role"><option value="super">Super: updates their own jobs</option><option value="viewer">Leader: view-only overview</option><option value="admin">Admin: sets up jobs and people</option></select></label>'+
+    '<label class="field" id="as-div-f"><span>Division</span><select id="as-div"><option value="">Choose…</option><option value="res">Restoration</option><option value="com">Commercial</option><option value="all">Both</option></select></label>'+
     '<label class="field" id="as-scope-f" hidden><span>Which jobs they see</span><select id="as-scope"><option value="all">All jobs</option><option value="com">Commercial jobs</option><option value="res">Restoration jobs</option></select></label>'+
     '<div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="as-go">Create sign-in link</button></div>',
-  close=>{$("#as-role").onchange=e=>{$("#as-scope-f").hidden=e.target.value!=="viewer"};
+  close=>{$("#as-role").onchange=e=>{$("#as-scope-f").hidden=e.target.value!=="viewer";$("#as-div-f").hidden=e.target.value!=="super"};
     $("#as-go").onclick=async()=>{const name=$("#as-name").value.trim();if(!name){$("#as-name").focus();return}const role=$("#as-role").value;
-    try{const code=await rpc("la_add_person",{p_code:S.code,p_name:name,p_role:role,p_scope:role==="viewer"?$("#as-scope").value:"all"});showLink(name,code)}
+    if(role==="super"&&!$("#as-div").value){$("#as-div").focus();toast("Pick Restoration, Commercial or Both");return}
+    try{const code=await rpc("la_add_person",{p_code:S.code,p_name:name,p_role:role,p_scope:role==="viewer"?$("#as-scope").value:role==="super"?$("#as-div").value:"all"});showLink(name,code)}
     catch(e){toast(e.message)}}})}
 
 function renderLogin(msg){
