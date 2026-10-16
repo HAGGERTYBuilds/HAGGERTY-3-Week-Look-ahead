@@ -209,12 +209,14 @@ tr.taskrow td{height:28px}
 .sheet .lg i{display:inline-block;width:12px;height:12px;vertical-align:-2px;margin-right:4px}
 
 @media print{
+  .sheet tbody tr{break-inside:avoid}
   @page{size:letter landscape;margin:.3in}
   body{background:#fff}
   .bar,.noprint,.toast{display:none!important}
   main{padding:0;max-width:none}
   .sheetwrap{box-shadow:none;overflow:visible}
   .sheet{width:100%;page-break-after:always;padding:0}
+  .sheetwrap:last-child .sheet{page-break-after:auto}
 }
 @media (max-width:640px){h1{font-size:24px}.logo small{display:none}.nav{margin-left:0;width:100%}.nav button{flex:1}}
 @media (prefers-reduced-motion:no-preference){.btn,.seg button,.nav button{transition:background .12s,border-color .12s}}
@@ -239,6 +241,20 @@ table.plain th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color
 .linkbox{font-family:ui-monospace,Menlo,monospace;font-size:13px;background:var(--surface-2);padding:10px 12px;border-radius:8px;word-break:break-all;user-select:all}
 .big{font-size:17px;min-height:52px;padding:12px 18px}
 .imsum{background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:14px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 0}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.tile b{display:block;font-family:var(--f-display);font-size:32px;line-height:1.1}.tile span{font-size:12px;color:var(--ink-2);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.tile small{display:block;color:var(--ink-2);font-size:12px;margin-top:2px}
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin:12px 0}
+.split .panel{padding:14px 16px}.split dl{display:grid;grid-template-columns:1fr auto;gap:4px 12px;margin:8px 0 0}.split dd{margin:0;font-weight:700;text-align:right}
+.load th,.load td{border-bottom:1px solid var(--line);padding:0;height:44px;background:var(--surface)}
+.load td.h{width:30px;min-width:30px;text-align:center;font-size:11px;font-weight:700;border-right:1px solid var(--surface)}
+.load td.h.cr{box-shadow:inset 0 -4px 0 var(--red)}
+.load .wh{padding:6px 10px;text-align:left;min-width:150px}.load .n{padding:0 8px;text-align:center;font-variant-numeric:tabular-nums}
+.load tr[data-sup]{cursor:pointer}.load tr[data-sup]:hover th,.load tr[data-sup]:hover td.n{background:var(--surface-2)}
+.lst{list-style:none;margin:0;padding:0}.lst li{display:flex;gap:10px;align-items:baseline;padding:8px 2px;border-bottom:1px solid var(--line)}
+.lst .dt{font-weight:700;min-width:84px;font-variant-numeric:tabular-nums}.lst button{all:unset;cursor:pointer;font-weight:600}.lst button:hover{text-decoration:underline}
+.warn{color:#B4540C;font-weight:600}
 .code{font-family:ui-monospace,Menlo,monospace;font-size:22px;letter-spacing:.2em;font-weight:700;background:var(--surface-2);padding:10px 14px;border-radius:8px;text-align:center;user-select:all}
 </style>
 </head>
@@ -249,6 +265,7 @@ table.plain th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color
     <span><b>HAGGERTY</b><small>Look-Ahead</small></span>
   </button>
   <nav class="nav" id="nav">
+    <button data-nav="over" id="navover" hidden>Overview</button>
     <button data-nav="dash">All jobs</button>
     <button data-nav="job">Job look-ahead</button>
     <button data-nav="sheets">Look-ahead sheets</button>
@@ -380,13 +397,13 @@ function loadCache(){try{const d=JSON.parse(ls.get(cacheKey())||"null");if(d){S.
 /* jobJSON is what the server stores; a job is dirty when it differs from the last copy the server accepted */
 const jobJSON=(j,i)=>JSON.stringify({id:j.id,superId:j.superId||null,number:j.number||"",name:j.name||"",mode:j.mode,cm:j.cm||"",sup:j.sup||"",color:j.color,weekends:!!j.weekends,sort:i,
   tasks:j.tasks.map(t=>({id:t.id,name:t.name||"",res:t.res||"",sec:!!t.sec,after:t.after||null,cells:t.cells||{}}))});
-function save(){persist();if(!S.demo)scheduleSync()}
+function save(){persist();if(!S.demo&&!isViewer())scheduleSync()}
 let syncTimer=null,syncing=false;
 function setSync(state,text){const el=$("#sync");if(!el)return;el.hidden=S.demo||!S.me;el.className="sync"+(state?" "+state:"");el.querySelector("span").textContent=text}
 function pending(){return S.archived.length+S.jobs.filter((j,i)=>S.synced[j.id]!==jobJSON(j,i)).length}
 function scheduleSync(){clearTimeout(syncTimer);setSync("busy","Saving…");syncTimer=setTimeout(syncNow,700)}
 async function syncNow(){
-  if(syncing||S.demo||!S.code){return}
+  if(syncing||S.demo||!S.code||isViewer()){return}
   syncing=true;
   try{
     while(S.archived.length){await rpc("la_archive_job",{p_code:S.code,p_job_id:S.archived[0]});S.archived.shift();persist()}
@@ -415,6 +432,10 @@ async function pull(){
   persist();if(pending())scheduleSync();else setSync("","All changes saved")}
 function superName(id){const x=S.supers.find(s=>s.id===id);return x?x.name:""}const job=id=>S.jobs.find(j=>j.id===id);
 const isAdmin=()=>S.demo||!!(S.me&&S.me.isAdmin);
+const isViewer=()=>!S.demo&&!!(S.me&&S.me.role==="viewer");
+const canLead=()=>isAdmin()||isViewer();
+const SCOPE={all:"All jobs",com:"Commercial",res:"Restoration"};
+const crew=()=>S.supers.filter(x=>x.role!=="viewer");
 const firstName=()=>((S.me&&S.me.name)||"").split(/\s+/)[0];
 const curJob=()=>job(S.jobId)||S.jobs[0];
 
@@ -472,12 +493,12 @@ function renderDash(){
   let todayCount=0,critWeek=0;const wkEnd=add(mondayOf(TODAY),6);
   S.jobs.forEach(j=>j.tasks.forEach(t=>{for(const [d,v] of Object.entries(t.cells||{})){if(d===TODAY)todayCount++;if(v==="R"&&d>=TODAY&&d<=wkEnd)critWeek++}}));
   const admin=isAdmin(),both=S.jobs.some(j=>j.mode==="res")&&S.jobs.some(j=>j.mode==="com");if(!both)S.filter="all";
-  let h='<div class="row"><div><div class="eyebrow">'+esc(S.demo?"Demo mode · nothing is saved to the server":(admin?S.me.name+" · admin, every super’s jobs":"Only you can see and change these"))+'</div><h1>'+(S.demo||admin?"All jobs":esc(firstName())+"’s jobs")+'</h1></div><span class="spacer"></span>'+
-    (admin?'<button class="btn" id="newjob">+ New job</button><button class="btn" id="import">Import schedule</button>':'')+(S.jobs.length?'<button class="btn" id="rainall">Lost day…</button><button class="btn" id="mkall">Print sheets</button>'+(S.demo?'':'<button class="btn primary" id="sendwk">Send this week’s look-aheads</button>'):'')+'</div>'+
+  let h='<div class="row"><div><div class="eyebrow">'+esc(S.demo?"Demo mode · nothing is saved to the server":(admin?S.me.name+" · admin, every super’s jobs":isViewer()?S.me.name+" · view only · "+SCOPE[S.me.scope||"all"]:"Only you can see and change these"))+'</div><h1>'+(S.demo||admin||isViewer()?(isViewer()&&S.me.scope!=="all"?SCOPE[S.me.scope]+" jobs":"All jobs"):esc(firstName())+"’s jobs")+'</h1></div><span class="spacer"></span>'+
+    (admin?'<button class="btn" id="newjob">+ New job</button><button class="btn" id="import">Import schedule</button>':'')+(S.jobs.length?(isViewer()?'':'<button class="btn" id="rainall">Lost day…</button>')+'<button class="btn" id="mkall">Print sheets</button>'+(S.demo||isViewer()?'':'<button class="btn primary" id="sendwk">Send this week’s look-aheads</button>'):'')+'</div>'+
     '<div class="stats"><div class="stat"><b class="num">'+S.jobs.length+'</b><span>Active jobs</span></div><div class="stat"><b class="num">'+todayCount+'</b><span>Tasks today</span></div><div class="stat"><b class="num" style="color:var(--red)">'+critWeek+'</b><span>Critical items left this week</span></div></div>'+
-    (!S.jobs.length?(admin?'<div class="panel" style="padding:18px;margin:14px 0;display:flex;flex-direction:column;gap:10px"><h2>No jobs yet</h2><p class="muted" style="margin:0">Import a schedule you already have (Microsoft Project or Excel), start a job from scratch, or load sample jobs to see how it works.</p><div class="row"><button class="btn primary" id="import2">Import schedule</button><button class="btn" id="newjob2">+ New job</button><button class="btn" id="addsamples">Load sample jobs</button></div></div>'
+    (!S.jobs.length?(isViewer()?'<div class="panel" style="padding:18px;margin:14px 0"><h2>No jobs yet</h2><p class="muted" style="margin:6px 0 0">Jobs show up here as soon as they’re added.</p></div>':admin?'<div class="panel" style="padding:18px;margin:14px 0;display:flex;flex-direction:column;gap:10px"><h2>No jobs yet</h2><p class="muted" style="margin:0">Import a schedule you already have (Microsoft Project or Excel), start a job from scratch, or load sample jobs to see how it works.</p><div class="row"><button class="btn primary" id="import2">Import schedule</button><button class="btn" id="newjob2">+ New job</button><button class="btn" id="addsamples">Load sample jobs</button></div></div>'
       :'<div class="panel" style="padding:18px;margin:14px 0"><h2>No jobs assigned to you yet</h2><p class="muted" style="margin:6px 0 0">When Liam assigns you a job it shows up here. Pull down or reopen the app to check again.</p></div>'):'')+
-    (admin&&S.supers.length>1?'<div class="toolbar"><label class="field" style="flex-direction:row;align-items:center;gap:8px"><span>Super</span><select id="supf"><option value="all">Everyone</option>'+S.supers.map(x=>'<option value="'+x.id+'"'+(S.superFilter===x.id?" selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label></div>':'')+
+    (canLead()&&crew().length>1?'<div class="toolbar"><label class="field" style="flex-direction:row;align-items:center;gap:8px"><span>Super</span><select id="supf"><option value="all">Everyone</option>'+crew().map(x=>'<option value="'+x.id+'"'+(S.superFilter===x.id?" selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label></div>':'')+
     '<div class="toolbar"><div class="seg" role="group" aria-label="View">'+
     [["gantt","Gantt"],["week","Week calendar"],["today","Plan my day"]].map(([v,l])=>'<button data-tab="'+v+'" aria-pressed="'+(S.tab===v)+'">'+l+'</button>').join("")+'</div>'+
     (both?'<div class="seg" role="group" aria-label="Filter">'+[["all","All"],["res","Restoration"],["com","Commercial"]].map(([v,l])=>'<button data-f="'+v+'" aria-pressed="'+(S.filter===v)+'">'+l+'</button>').join("")+'</div>':'')+
@@ -505,7 +526,7 @@ function ganttHTML(js,ds){
   if(!js.length)h+='<tr><td class="stick" colspan="'+(ds.length+1)+'" style="padding:16px">No jobs in this filter.</td></tr>';
   js.forEach(j=>{const L=labels(j),open=!!S.open[j.id];const tasks=j.tasks.filter(t=>!t.sec);
     h+='<tr class="jobrow" data-job="'+j.id+'"><th class="stick g-job" style="text-align:left"><div class="nm"><span class="dot" style="background:'+j.color+'"></span>'+esc(j.name)+'</div>'+
-      '<div class="sub"><span class="num">'+esc(j.number)+'</span><span class="pill'+(j.mode==="res"?" res":"")+'">'+L.kind+'</span>'+(S.me&&S.me.isAdmin&&superName(j.superId)?'<span>'+esc(superName(j.superId))+'</span>':'')+(sentThisWeek(j)?'<span class="sent">✓ SENT</span>':'')+'</div>'+
+      '<div class="sub"><span class="num">'+esc(j.number)+'</span><span class="pill'+(j.mode==="res"?" res":"")+'">'+L.kind+'</span>'+(canLead()&&superName(j.superId)?'<span>'+esc(superName(j.superId))+'</span>':'')+(sentThisWeek(j)?'<span class="sent">✓ SENT</span>':'')+'</div>'+
       '<div class="acts"><button class="btn sm" data-open="'+j.id+'">Open</button><button class="btn sm" data-sheet="'+j.id+'">Sheet</button><button class="btn sm ghost" data-exp="'+j.id+'" aria-expanded="'+open+'">'+(open?"Hide tasks":"Show "+tasks.length+" tasks")+'</button></div></th>';
     ds.forEach(d=>{let b=0,r=0;tasks.forEach(t=>{const v=t.cells[d];if(v==="B")b++;else if(v==="R")r++});const n=b+r;
       h+='<td class="d sum'+(r?" sr":n?" sb":"")+(isWE(d)?" we":"")+(dow(d)===1?" wk":"")+(d===TODAY?" today":"")+'" title="'+esc(j.name)+" · "+fmtLong(d)+": "+n+' task(s)">'+(n?'<i></i>'+(n>1?'<em>'+n+'</em>':''):"")+'</td>'});
@@ -532,35 +553,76 @@ function todayHTML(js){const tm=addWork(TODAY,1,false);
     h+='<div class="eyebrow">Starting next</div>'+(next.length?'<ul>'+next.map(t=>'<li><i class="sw"></i>'+esc(t.name)+' <span class="muted">· '+esc(t.res||"")+'</span></li>').join("")+'</ul>':'<div class="empty">Nothing new starts</div>')+'</article>'});
   return h+'</div>'}
 
+/* ---------- Overview for leaders (VP: every job; general superintendents: their job type) ---------- */
+function renderOver(){
+  const sc=isViewer()?(S.me.scope||"all"):"all",js=S.jobs.filter(j=>sc==="all"||j.mode===sc),ds=days();
+  const wk0=mondayOf(TODAY),wk1=add(wk0,6),in7=add(TODAY,7),in14=add(TODAY,14),stale=add(TODAY,-7);
+  const cellsIn=(j,a,b,want)=>j.tasks.filter(t=>Object.entries(t.cells||{}).some(([d,v])=>d>=a&&d<=b&&(!want||v===want))).length;
+  const tasksIn=(j,a,b)=>j.tasks.filter(t=>!t.sec&&Object.keys(t.cells||{}).some(d=>d>=a&&d<=b)).length;
+  const upd=j=>j.updatedAt?String(j.updatedAt).slice(0,10):"";
+  const owner=j=>j.superId||("name:"+(j.sup||"?"));
+  const people=new Map();js.forEach(j=>{const k=owner(j);if(!people.has(k))people.set(k,{id:j.superId,name:superName(j.superId)||j.sup||"Unassigned",jobs:[]});people.get(k).jobs.push(j)});
+  const sent=js.filter(sentThisWeek).length,crit7=js.reduce((n,j)=>n+cellsIn(j,TODAY,in7,"R"),0),old=js.filter(j=>upd(j)&&upd(j)<stale);
+  const title=sc==="all"?"Company schedule":SCOPE[sc]+" team";
+  let h='<div class="row"><div><div class="eyebrow">'+esc((S.me&&S.me.name)||"")+' · '+(isViewer()?"view only":"admin")+' · '+fmtLong(TODAY)+'</div><h1>'+title+'</h1></div><span class="spacer"></span>'+(js.length?'<button class="btn" id="o-print">Print sheets</button>':'')+'</div>'+
+    '<div class="tiles"><div class="tile"><span>Active jobs</span><b class="num">'+js.length+'</b></div><div class="tile"><span>Supers</span><b class="num">'+people.size+'</b></div>'+
+    '<div class="tile"><span>Sent this week</span><b class="num">'+sent+' / '+js.length+'</b><small>look-aheads in since Monday</small></div>'+
+    '<div class="tile"><span>Critical, next 7 days</span><b class="num" style="color:var(--red)">'+crit7+'</b><small>inspections, deliveries, deadlines</small></div>'+
+    '<div class="tile"><span>Not updated 7+ days</span><b class="num"'+(old.length?' style="color:#B4540C"':'')+'>'+old.length+'</b></div></div>';
+  if(sc==="all"){h+='<div class="split">'+["com","res"].map(m=>{const g=js.filter(j=>j.mode===m),sp=new Set(g.map(owner));
+    return '<section class="panel"><h3>'+SCOPE[m]+'</h3><dl><dt>Jobs</dt><dd class="num">'+g.length+'</dd><dt>Supers</dt><dd class="num">'+sp.size+'</dd><dt>Tasks running this week</dt><dd class="num">'+g.reduce((n,j)=>n+tasksIn(j,wk0,wk1),0)+'</dd><dt>Critical, next 7 days</dt><dd class="num" style="color:var(--red)">'+g.reduce((n,j)=>n+cellsIn(j,TODAY,in7,"R"),0)+'</dd><dt>Sent this week</dt><dd class="num">'+g.filter(sentThisWeek).length+' / '+g.length+'</dd></dl></section>'}).join("")+'</div>'}
+  /* workload: one row per super, a heat strip of how many tasks they have running each day */
+  const rows=[...people.values()].map(x=>({...x,day:ds.map(d=>{let n=0,r=false;x.jobs.forEach(j=>j.tasks.forEach(t=>{const v=t.cells&&t.cells[d];if(v){n++;if(v==="R")r=true}}));return {n,r}})}));
+  rows.forEach(x=>{x.week=x.jobs.reduce((n,j)=>n+tasksIn(j,wk0,wk1),0);x.crit=x.jobs.reduce((n,j)=>n+cellsIn(j,ds[0],ds[ds.length-1],"R"),0);x.sent=x.jobs.filter(sentThisWeek).length;
+    x.last=x.jobs.map(upd).filter(Boolean).sort().pop()||""});
+  rows.sort((a,b)=>b.week-a.week);const mx=Math.max(1,...rows.flatMap(x=>x.day.map(c=>c.n)));
+  h+='<div class="row" style="margin-top:20px"><h2>Workload by super</h2><span class="spacer"></span>'+windowBar()+'</div><p class="hint">Each square is one day; darker means more tasks running across that super’s jobs. A red line means something critical is due that day. Tap a super to see their jobs.</p>'+
+    '<div class="scroller"><table class="grid load"><thead>'+monthHeader(ds,5)+'<tr class="dy"><th class="stick wh">Super</th><th class="n">Jobs</th><th class="n">Tasks this week</th><th class="n">Critical</th><th class="n">Sent</th>'+dayHeads(ds)+'</tr></thead><tbody>'+
+    (rows.length?rows.map(x=>'<tr'+(x.id?' data-sup="'+x.id+'"':'')+'><th class="stick wh"><div style="font-weight:700">'+esc(x.name)+'</div><div class="hint">'+(x.last?"Updated "+fmt(x.last)+(x.last<stale?' <span class="warn">· stale</span>':''):"Not updated yet")+'</div></th>'+
+      '<td class="n">'+x.jobs.length+'</td><td class="n">'+x.week+'</td><td class="n" style="color:var(--red);font-weight:700">'+(x.crit||"")+'</td><td class="n">'+x.sent+'/'+x.jobs.length+'</td>'+
+      x.day.map((c,i)=>'<td class="h'+(c.r?" cr":"")+(dow(ds[i])===1?" wk":"")+'" style="'+(c.n?'background:color-mix(in srgb,var(--blue) '+Math.round(15+70*c.n/mx)+'%,var(--surface));color:'+(c.n/mx>.55?"#fff":"var(--ink)"):'')+'" title="'+esc(x.name)+' · '+fmtLong(ds[i])+': '+c.n+' task(s)">'+(c.n||"")+'</td>').join("")+'</tr>').join("")
+    :'<tr><td class="wh muted" colspan="'+(5+ds.length)+'">No jobs yet.</td></tr>')+'</tbody></table></div>';
+  /* coming up critical, and jobs that need a nudge */
+  const firstCrit=new Map();js.forEach(j=>j.tasks.forEach(t=>{const ds2=Object.entries(t.cells||{}).filter(([d,v])=>v==="R"&&d>=TODAY&&d<=in14).map(([d])=>d).sort();if(ds2.length)firstCrit.set(t.id,{d:ds2[0],j,t})}));
+  const cl=[...firstCrit.values()].sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+  const nudge=js.filter(j=>!sentThisWeek(j)||(upd(j)&&upd(j)<stale));
+  h+='<div class="split" style="margin-top:20px"><section class="panel"><h3>Critical items, next 2 weeks</h3>'+(cl.length?'<ul class="lst">'+cl.slice(0,15).map(c=>'<li><span class="dt">'+DOW[dow(c.d)]+' '+fmt(c.d)+'</span><span><button data-open="'+c.j.id+'">'+esc(c.t.name)+'</button><br><span class="hint">'+esc(c.j.name)+' · '+esc(superName(c.j.superId)||c.j.sup||"")+'</span></span></li>').join("")+'</ul>'+(cl.length>15?'<p class="hint">and '+(cl.length-15)+' more</p>':''):'<p class="muted">Nothing critical in the next 2 weeks.</p>')+'</section>'+
+    '<section class="panel"><h3>Needs a nudge</h3>'+(nudge.length?'<ul class="lst">'+nudge.map(j=>'<li><span><button data-open="'+j.id+'">'+esc(j.name)+'</button><br><span class="hint">'+esc(superName(j.superId)||j.sup||"")+' · '+(!sentThisWeek(j)?"not sent this week":"")+(!sentThisWeek(j)&&upd(j)&&upd(j)<stale?" · ":"")+(upd(j)&&upd(j)<stale?"last updated "+fmt(upd(j)):"")+'</span></span></li>').join("")+'</ul>':'<p class="muted">Every job is sent and up to date.</p>')+'</section></div>';
+  $("#app").innerHTML=h;bindWindow();
+  const op=$("#o-print");op&&(op.onclick=()=>pickSheets());
+  document.querySelectorAll("tr[data-sup]").forEach(r=>r.onclick=()=>go("dash",{superFilter:r.dataset.sup,tab:"gantt"}));
+  document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>go("job",{jobId:b.dataset.open}));
+}
+
 /* ---------- Job editor ---------- */
 function renderJob(){
   const j=curJob();if(!j){go("dash");return}S.jobId=j.id;const L=labels(j),ds=days();
   let h='<div class="row"><div><div class="eyebrow">'+L.kind+' look-ahead</div><h1>'+esc(j.name||"Untitled job")+'</h1></div><span class="spacer"></span>'+
     (S.jobs.length>1?'<select id="jobpick" aria-label="Switch job">'+S.jobs.map(x=>'<option value="'+x.id+'"'+(x.id===j.id?" selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select>':'')+
-    '<button class="btn" id="lost">Lost day…</button><button class="btn primary" id="sheet1">Print sheet</button></div>'+
+    (isViewer()?'':'<button class="btn" id="lost">Lost day…</button>')+'<button class="btn primary" id="sheet1">Print sheet</button></div>'+
     (isAdmin()?'<div class="panel jobhead">'+
     field("Job #","number",j.number)+field(j.mode==="com"?"Project":"Name / address","name",j.name)+field(L.cm,"cm",j.cm)+
-    (S.supers.length?'<label class="field"><span>Super</span><select id="jsuper">'+(j.superId?'':'<option value="">Choose…</option>')+S.supers.map(x=>'<option value="'+x.id+'"'+(x.id===j.superId?" selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label>':field("Super","sup",j.sup))+
+    (crew().length?'<label class="field"><span>Super</span><select id="jsuper">'+(j.superId?'':'<option value="">Choose…</option>')+crew().map(x=>'<option value="'+x.id+'"'+(x.id===j.superId?" selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label>':field("Super","sup",j.sup))+
     '<div class="field"><span>Type</span><div class="seg" role="group" aria-label="Job type"><button data-mode="res" aria-pressed="'+(j.mode==="res")+'">Restoration</button><button data-mode="com" aria-pressed="'+(j.mode==="com")+'">Commercial</button></div></div>'+
     '<div class="field"><span>Crew works weekends</span><label class="chk"><input type="checkbox" id="wkend"'+(j.weekends?" checked":"")+'> Count Sat and Sun as workdays</label></div></div>'
     :'<div class="panel jobhead">'+[["Job #",j.number],[j.mode==="com"?"Project":"Name / address",j.name],[L.cm,j.cm],["Super",j.sup||S.me.name]].map(([a,b])=>'<div class="ro field"><span>'+a+'</span><b>'+esc(b||"–")+'</b></div>').join("")+'</div>')+
-    (ls.get(KEY+":help")?'':'<div class="help" id="help"><div style="flex:1"><h3>How to update this look-ahead</h3><ol><li>Tap a day box to mark it: once for <b style="color:var(--blue)">blue</b> (work scheduled), twice for <b style="color:var(--red)">red</b> (critical: inspection, delivery, deadline), three times to clear it.</li><li>Tap <b>⋯</b> on a task to move it a day, delete it, or set what it starts after.</li><li>Rain day? Tap <b>Lost day…</b> and everything slides one workday.</li><li>Everything saves by itself, even with no signal.</li></ol></div><button class="btn sm" id="helpx">Got it</button></div>')+
-    '<div class="toolbar">'+windowBar()+'<span class="spacer"></span>'+
+    (isViewer()?'<p class="hint">View only. '+esc(j.sup||superName(j.superId)||"The super")+' keeps this look-ahead up to date.</p>':ls.get(KEY+":help")?'':'<div class="help" id="help"><div style="flex:1"><h3>How to update this look-ahead</h3><ol><li>Tap a day box to mark it: once for <b style="color:var(--blue)">blue</b> (work scheduled), twice for <b style="color:var(--red)">red</b> (critical: inspection, delivery, deadline), three times to clear it.</li><li>Tap <b>⋯</b> on a task to move it a day, delete it, or set what it starts after.</li><li>Rain day? Tap <b>Lost day…</b> and everything slides one workday.</li><li>Everything saves by itself, even with no signal.</li></ol></div><button class="btn sm" id="helpx">Got it</button></div>')+
+    '<div class="toolbar">'+windowBar()+'<span class="spacer"></span>'+(isViewer()?'</div>':
     '<div class="seg" role="group" aria-label="What a tap does">'+[["cycle","Tap to change"],["B",'<i class="sw b"></i>Blue brush'],["R",'<i class="sw r"></i>Red brush'],["",'Eraser']].map(([v,l])=>'<button data-brush="'+v+'" aria-pressed="'+(S.brush===v)+'">'+l+'</button>').join("")+'</div></div>'+
-    '<p class="hint" style="margin:-4px 0 10px">'+(S.brush==="cycle"?"Tap a day: blank → blue → red → blank.":"Drag your finger across days to paint them. Tap “Tap to change” again to scroll the grid.")+' Start and End fill in by themselves, and tasks set to start after a late task move out automatically.</p>';
+    '<p class="hint" style="margin:-4px 0 10px">'+(S.brush==="cycle"?"Tap a day: blank → blue → red → blank.":"Drag your finger across days to paint them. Tap “Tap to change” again to scroll the grid.")+' Start and End fill in by themselves, and tasks set to start after a late task move out automatically.</p>');
   const lc=6;
   h+='<div class="scroller"><table class="grid'+(S.brush!=="cycle"?" paint":"")+'" id="grid"><thead>'+monthHeader(ds,lc,'<th class="stick" colspan="2"></th><th colspan="4"></th>')+
     '<tr class="dy"><th class="stick c-id">'+L.id+'</th><th class="stick c-task" style="text-align:left;padding-left:8px">'+L.task+'</th><th class="c-res" style="text-align:left;padding-left:8px">'+L.res+'</th><th class="c-dt">Start</th><th class="c-dt">End</th><th class="c-act"></th>'+dayHeads(ds)+'</tr></thead><tbody>';
   let n=0;
   j.tasks.forEach(t=>{
-    if(t.sec){h+='<tr class="sec" data-t="'+t.id+'"><td class="stick c-id"></td><td class="stick c-task"><input class="cell" data-f="name" value="'+esc(t.name)+'" aria-label="Section name"></td><td colspan="3"></td><td class="c-act"><button class="iconbtn" data-menu="'+t.id+'" aria-label="Section options">⋯</button></td><td class="secfill" colspan="'+ds.length+'"></td></tr>';return}
+    if(t.sec){h+='<tr class="sec" data-t="'+t.id+'"><td class="stick c-id"></td><td class="stick c-task"><input class="cell" data-f="name" value="'+esc(t.name)+'" aria-label="Section name"'+(isViewer()?" readonly":"")+'></td><td colspan="3"></td><td class="c-act">'+(isViewer()?'':'<button class="iconbtn" data-menu="'+t.id+'" aria-label="Section options">⋯</button>')+'</td><td class="secfill" colspan="'+ds.length+'"></td></tr>';return}
     n++;const pr=t.after&&j.tasks.find(x=>x.id===t.after);
-    h+='<tr data-t="'+t.id+'"><td class="stick c-id">'+n+'</td><td class="stick c-task"><input class="cell" data-f="name" value="'+esc(t.name)+'" placeholder="New task" aria-label="Task name">'+(pr?'<span class="dep">after '+esc(pr.name)+'</span>':'')+'</td>'+
-      '<td class="c-res"><input class="cell" data-f="res" value="'+esc(t.res||"")+'" aria-label="'+L.res+'"></td><td class="c-dt" data-s>'+fmt(tStart(t))+'</td><td class="c-dt" data-e>'+fmt(tEnd(t))+'</td>'+
-      '<td class="c-act"><button class="iconbtn" data-menu="'+t.id+'" aria-label="Task options">⋯</button></td>';
+    h+='<tr data-t="'+t.id+'"><td class="stick c-id">'+n+'</td><td class="stick c-task"><input class="cell" data-f="name" value="'+esc(t.name)+'" placeholder="New task" aria-label="Task name"'+(isViewer()?" readonly":"")+'>'+(pr?'<span class="dep">after '+esc(pr.name)+'</span>':'')+'</td>'+
+      '<td class="c-res"><input class="cell" data-f="res" value="'+esc(t.res||"")+'" aria-label="'+L.res+'"'+(isViewer()?" readonly":"")+'></td><td class="c-dt" data-s>'+fmt(tStart(t))+'</td><td class="c-dt" data-e>'+fmt(tEnd(t))+'</td>'+
+      '<td class="c-act">'+(isViewer()?'':'<button class="iconbtn" data-menu="'+t.id+'" aria-label="Task options">⋯</button>')+'</td>';
     ds.forEach(d=>{const v=t.cells[d];h+='<td class="d'+(v==="B"?" b":v==="R"?" r":"")+(isWE(d)?" we":"")+(dow(d)===1?" wk":"")+(d===TODAY?" today":"")+'" data-d="'+d+'" aria-label="'+esc(t.name)+" "+fmtLong(d)+'"></td>'});
     h+='</tr>'});
-  h+='</tbody></table></div><div class="row" style="margin-top:12px"><button class="btn" id="addtask">+ Task</button><button class="btn" id="addsec">+ Section</button><span class="spacer"></span><div class="legend"><span><i class="sw b"></i>Scheduled work</span><span><i class="sw r"></i>Critical</span></div>'+(isAdmin()?'<button class="btn ghost sm danger" id="deljob">Delete job</button>':'')+'</div>';
+  h+='</tbody></table></div><div class="row" style="margin-top:12px">'+(isViewer()?'':'<button class="btn" id="addtask">+ Task</button><button class="btn" id="addsec">+ Section</button>')+'<span class="spacer"></span><div class="legend"><span><i class="sw b"></i>Scheduled work</span><span><i class="sw r"></i>Critical</span></div>'+(isAdmin()?'<button class="btn ghost sm danger" id="deljob">Delete job</button>':'')+'</div>';
   $("#app").innerHTML=h;bindJob(j);
 }
 function field(label,key,val){return '<label class="field"><span>'+label+'</span><input type="text" data-jf="'+key+'" value="'+esc(val)+'"></label>'}
@@ -571,11 +633,12 @@ function bindJob(j){
   const hx=$("#helpx");hx&&(hx.onclick=()=>{ls.set(KEY+":help","1");$("#help").remove()});
   const js=$("#jsuper");js&&(js.onchange=()=>{j.superId=js.value||null;j.sup=superName(j.superId);save();toast("Assigned to "+j.sup)});
   $("#sheet1").onclick=()=>go("sheets",{sheetIds:[j.id]});
-  $("#lost").onclick=()=>lostDayDialog(j);
+  const lb=$("#lost");lb&&(lb.onclick=()=>lostDayDialog(j));
   document.querySelectorAll("[data-jf]").forEach(i=>i.onchange=()=>{j[i.dataset.jf]=i.value;j.example=false;save();if(i.dataset.jf==="name")$("h1").textContent=i.value});
   document.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{j.mode=b.dataset.mode;save();render()});
   const wk=$("#wkend");wk&&(wk.onchange=e=>{j.weekends=e.target.checked;save()});
   document.querySelectorAll("[data-brush]").forEach(b=>b.onclick=()=>{S.brush=b.dataset.brush;render()});
+  if(isViewer())return;
   $("#addtask").onclick=()=>{j.tasks.push({id:uid(),name:"",res:"",after:null,cells:{}});save();render();const ins=document.querySelectorAll('#grid input[data-f="name"]');ins[ins.length-1].focus()};
   $("#addsec").onclick=()=>{j.tasks.push({id:uid(),name:"New section",sec:true,cells:{}});save();render()};
   const dj=$("#deljob");dj&&(dj.onclick=()=>modal('<h2>Delete '+esc(j.name)+'?</h2><p class="muted">This removes the job from your list. Its history stays on the server.</p><div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn danger" id="dodel">Delete job</button></div>',c=>{$("#dodel").onclick=()=>{S.jobs=S.jobs.filter(x=>x.id!==j.id);if(!S.demo&&S.synced[j.id]!==undefined)S.archived.push(j.id);delete S.synced[j.id];save();c();go("dash");toast("Job deleted")}}));
@@ -625,7 +688,7 @@ function newJob(){
       tasks:mode==="com"?[{id:uid(),name:"Submittals",sec:true,cells:{}},{id:uid(),name:"",res:"",after:null,cells:{}}]:[{id:uid(),name:"",res:"",after:null,cells:{}}]};
       S.jobs.push(j);save();close();go("job",{jobId:j.id})}})}
 
-function superPick(id,sel){if(!S.supers.length)return "";return '<label class="field"><span>Super on this job</span><select id="'+id+'">'+S.supers.map(x=>'<option value="'+x.id+'"'+(x.id===(sel||(S.me&&S.me.id))?" selected":"")+'>'+esc(x.name)+(x.isAdmin?" (admin)":"")+'</option>').join("")+'</select></label>'}
+function superPick(id,sel){if(!crew().length)return "";return '<label class="field"><span>Super on this job</span><select id="'+id+'">'+crew().map(x=>'<option value="'+x.id+'"'+(x.id===(sel||(S.me&&S.me.id))?" selected":"")+'>'+esc(x.name)+(x.isAdmin?" (admin)":"")+'</option>').join("")+'</select></label>'}
 function pickedSuper(id){const e=document.getElementById(id);return e&&e.value||null}
 
 /* ---------- Import an existing schedule ----------
@@ -790,25 +853,40 @@ function importPreview(r){
 
 /* ---------- Look-ahead sheets ---------- */
 function pickSheets(){
-  modal('<h2>Create look-ahead sheets</h2><p class="muted">One sheet per job for '+rangeLabel()+'.</p><div class="field"><span>Jobs</span>'+visibleJobs().map(x=>'<label class="chk"><input type="checkbox" class="sj" value="'+x.id+'" checked> '+esc(x.name)+'</label>').join("")+'</div>'+
+  if(!P.start)P.start=mondayOf(TODAY);
+  modal('<h2>Print look-ahead sheets</h2><p class="muted">One sheet per job for '+pRange()+'. You can change the weeks on the next screen.</p><div class="field"><span>Jobs</span>'+visibleJobs().map(x=>'<label class="chk"><input type="checkbox" class="sj" value="'+x.id+'" checked> '+esc(x.name)+'</label>').join("")+'</div>'+
     '<div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="sjgo">Create sheets</button></div>',
   close=>{$("#sjgo").onclick=()=>{const ids=[...document.querySelectorAll(".sj:checked")].map(i=>i.value);close();go("sheets",{sheetIds:ids})}})}
+/* Printing has its own window: 3 weeks from this Monday unless changed here, and only the tasks with work in it */
+const P={start:null,weeks:3,all:false};
+const pDays=()=>{const out=[];for(let i=0;i<P.weeks*7;i++){const d=add(P.start,i);if(S.hideWE&&isWE(d))continue;out.push(d)}return out};
+const pRange=()=>fmt(P.start)+" – "+fmt(add(P.start,P.weeks*7-1))+", "+p(add(P.start,P.weeks*7-1)).getFullYear();
+function printRows(j,ds){if(P.all)return j.tasks;const a=ds[0],b=ds[ds.length-1],out=[];let sec=null;
+  j.tasks.forEach(t=>{if(t.sec){sec=t;return}if(!Object.keys(t.cells||{}).some(d=>d>=a&&d<=b))return;if(sec){out.push(sec);sec=null}out.push(t)});return out}
 function renderSheets(){
-  const ids=(S.sheetIds&&S.sheetIds.length?S.sheetIds:S.jobs.map(j=>j.id)).filter(job);const ds=days();
-  let h='<div class="noprint"><div class="row"><div><div class="eyebrow">'+ids.length+' sheet'+(ids.length===1?"":"s")+' · '+rangeLabel()+'</div><h1>Look-ahead sheets</h1></div><span class="spacer"></span><button class="btn" id="back">← All jobs</button><button class="btn" id="pick">Choose jobs…</button><button class="btn primary" id="print">Print / Save PDF</button></div>'+
-    '<div class="toolbar">'+windowBar()+'</div><p class="hint">Each job prints on its own letter-landscape page. On iPad, Print opens the share sheet where you can print or save a PDF.</p></div><div class="sheets">';
+  if(!P.start)P.start=mondayOf(TODAY);
+  const ids=(S.sheetIds&&S.sheetIds.length?S.sheetIds:S.jobs.map(j=>j.id)).filter(job);const ds=pDays();
+  const shown=ids.reduce((n,id)=>n+printRows(job(id),ds).filter(t=>!t.sec).length,0),total=ids.reduce((n,id)=>n+job(id).tasks.filter(t=>!t.sec).length,0);
+  let h='<div class="noprint"><div class="row"><div><div class="eyebrow">'+ids.length+' job'+(ids.length===1?"":"s")+' · '+pRange()+'</div><h1>Print look-ahead sheets</h1></div><span class="spacer"></span><button class="btn" id="back">← Back</button><button class="btn" id="pick">Choose jobs…</button><button class="btn primary big" id="print">Print / Save PDF</button></div>'+
+    '<div class="toolbar"><div class="seg" role="group" aria-label="Which weeks"><button data-pw="-1">‹ Week</button><button data-pw="0">This week</button><button data-pw="1">Week ›</button></div>'+
+    '<div class="seg" role="group" aria-label="How many weeks">'+[1,2,3,4].map(n=>'<button data-pn="'+n+'" aria-pressed="'+(P.weeks===n)+'">'+n+' week'+(n>1?"s":"")+'</button>').join("")+'</div>'+
+    '<label class="chk"><input type="checkbox" id="pall"'+(P.all?" checked":"")+'> Also print tasks with no work these weeks</label></div>'+
+    '<p class="hint">'+(P.all?"Printing all "+total+" tasks.":"Printing the "+shown+" task"+(shown===1?"":"s")+" with work in these weeks"+(total>shown?" (of "+total+")":"")+".")+' Each job starts on a new letter-landscape page. On iPad, Print opens the share sheet where you can print or save a PDF.</p></div><div class="sheets">';
   ids.forEach((id,i)=>h+='<div class="sheetwrap">'+sheetHTML(job(id),ds,i+1,ids.length)+'</div>');
-  $("#app").innerHTML=h+'</div>';bindWindow();$("#back").onclick=()=>go("dash");$("#pick").onclick=()=>pickSheets();$("#print").onclick=()=>window.print();
+  $("#app").innerHTML=h+'</div>';$("#back").onclick=()=>S.sheetIds&&S.sheetIds.length===1?go("job",{jobId:S.sheetIds[0]}):go(isViewer()?"over":"dash");$("#pick").onclick=()=>pickSheets();$("#print").onclick=()=>window.print();
+  document.querySelectorAll("[data-pw]").forEach(b=>b.onclick=()=>{const w=+b.dataset.pw;P.start=w?add(P.start,7*w):mondayOf(TODAY);render()});
+  document.querySelectorAll("[data-pn]").forEach(b=>b.onclick=()=>{P.weeks=+b.dataset.pn;render()});
+  $("#pall").onchange=e=>{P.all=e.target.checked;render()};
 }
 function sheetHTML(j,ds,i,n){
   const L=labels(j);const W=Math.max(16,Math.min(26,Math.floor(560/ds.length)));
   let h='<article class="sheet"><div class="sh-top"><div class="sh-logo">'+LOGO+'<div><b>HAGGERTY</b><small>ADVISE. BUILD. RESTORE. MAINTAIN.</small></div></div>'+
-    '<div class="sh-title"><h2>'+S.weeks+'-Week Look-Ahead</h2><div>'+rangeLabel()+'</div></div></div>'+
+    '<div class="sh-title"><h2>'+P.weeks+'-Week Look-Ahead</h2><div>'+pRange()+'</div></div></div>'+
     '<div class="sh-meta"><div><span>Job #</span>'+esc(j.number)+'</div><div><span>'+(j.mode==="com"?"Project":"Name")+'</span>'+esc(j.name)+'</div><div><span>'+L.cm+'</span>'+esc(j.cm)+'</div><div><span>Super</span>'+esc(j.sup)+'</div></div>'+
     '<table><colgroup><col style="width:34px"><col><col style="width:120px"><col style="width:58px"><col style="width:58px">'+ds.map(()=>'<col style="width:'+W+'px">').join("")+'</colgroup><thead>';
   let mo='<tr><th colspan="5"></th>',x=0;while(x<ds.length){const m=p(ds[x]).getMonth();let c=0;while(x+c<ds.length&&p(ds[x+c]).getMonth()===m)c++;mo+='<th colspan="'+c+'" style="text-align:left">'+(c>2?MO[m].toUpperCase():"")+'</th>';x+=c}
   h+=mo+'</tr><tr><th>'+L.id+'</th><th style="text-align:left">'+L.task+'</th><th style="text-align:left">'+L.res+'</th><th>Start</th><th>End</th>'+ds.map(d=>'<th class="d'+(isWE(d)?" we":"")+(d===TODAY?" tdy":"")+'">'+DOW[dow(d)][0]+'<br>'+p(d).getDate()+'</th>').join("")+'</tr></thead><tbody>';
-  let k2=0;j.tasks.forEach(t=>{if(t.sec){h+='<tr class="sec"><td></td><td colspan="'+(4+ds.length)+'">'+esc(t.name)+'</td></tr>';return}k2++;
+  let k2=0;printRows(j,ds).forEach(t=>{if(t.sec){h+='<tr class="sec"><td></td><td colspan="'+(4+ds.length)+'">'+esc(t.name)+'</td></tr>';return}k2++;
     h+='<tr><td style="text-align:center">'+k2+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.res||"")+'</td><td style="text-align:center">'+fmt(tStart(t))+'</td><td style="text-align:center">'+fmt(tEnd(t))+'</td>'+
       ds.map(d=>{const v=t.cells[d];return '<td class="d'+(v==="B"?" b":v==="R"?" r":isWE(d)?" we":"")+'"></td>'}).join("")+'</tr>'});
   for(let e=0;e<Math.max(0,4-k2);e++)h+='<tr><td></td><td></td><td></td><td></td><td></td>'+ds.map(d=>'<td class="d'+(isWE(d)?" we":"")+'"></td>').join("")+'</tr>';
@@ -831,17 +909,17 @@ function sendWeek(){
 
 async function renderTeam(){
   if(!S.me||!S.me.isAdmin){go("dash");return}
-  $("#app").innerHTML='<div class="row"><div><div class="eyebrow">Admin</div><h1>Team</h1></div><span class="spacer"></span><button class="btn primary" id="addsup">+ Add super</button></div><p class="muted">Loading…</p>';
+  $("#app").innerHTML='<div class="row"><div><div class="eyebrow">Admin</div><h1>Team</h1></div><span class="spacer"></span><button class="btn primary" id="addsup">+ Add person</button></div><p class="muted">Loading…</p>';
   $("#addsup").onclick=addSuper;
   let rep=[];try{const d=await rpc("la_get_jobs",{p_code:S.code});S.supers=d.supers||[];rep=await rpc("la_week_report",{p_code:S.code,p_week_start:weekStart()})||[]}catch(e){toast(e.message)}
   if(S.view!=="team")return;
   const sent=rep.filter(r=>r.submittedAt).length;
-  let h='<div class="row"><div><div class="eyebrow">Admin</div><h1>Team</h1></div><span class="spacer"></span><button class="btn primary" id="addsup">+ Add super</button></div>'+
+  let h='<div class="row"><div><div class="eyebrow">Admin</div><h1>Team</h1></div><span class="spacer"></span><button class="btn primary" id="addsup">+ Add person</button></div>'+
     '<h2 style="margin-top:18px">Week of '+fmtLong(weekStart())+'</h2><p class="muted">'+sent+' of '+rep.length+' jobs sent this week.</p>'+
     '<div class="scroller"><table class="plain"><thead><tr><th>Super</th><th>Job</th><th>Job #</th><th>Sent</th></tr></thead><tbody>'+
     (rep.length?rep.map(r=>'<tr><td>'+esc(r.super)+'</td><td>'+esc(r.job)+'</td><td class="num">'+esc(r.number)+'</td><td>'+(r.submittedAt?'<span class="sent">✓ '+esc(new Date(r.submittedAt).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"}))+'</span>':'<span class="muted">Not yet</span>')+'</td></tr>').join(""):'<tr><td colspan="4" class="muted">No jobs yet.</td></tr>')+'</tbody></table></div>'+
-    '<h2 style="margin-top:22px">Supers</h2><p class="muted">Each super gets a personal link. Opening it signs them straight in, and they only ever see the jobs assigned to them.</p><div class="scroller"><table class="plain"><thead><tr><th>Name</th><th>Role</th><th>Jobs</th><th>Last opened the app</th><th></th></tr></thead><tbody>'+
-    S.supers.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+(x.isAdmin?"Admin":"Super")+'</td><td class="num">'+S.jobs.filter(j=>j.superId===x.id).length+'</td><td>'+(x.lastSeen?esc(new Date(x.lastSeen).toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})):'<span class="muted">Never</span>')+'</td><td><button class="btn sm" data-relink="'+x.id+'">New sign-in link</button></td></tr>').join("")+'</tbody></table></div>';
+    '<h2 style="margin-top:22px">People</h2><p class="muted">Each person gets a personal link. Opening it signs them straight in. Supers only see the jobs assigned to them; leaders get a view-only overview of their jobs.</p><div class="scroller"><table class="plain"><thead><tr><th>Name</th><th>Role</th><th>Jobs</th><th>Last opened the app</th><th></th></tr></thead><tbody>'+
+    S.supers.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+(x.isAdmin?"Admin":x.role==="viewer"?"View only · "+SCOPE[x.scope||"all"]:"Super")+'</td><td class="num">'+(x.role==="viewer"?"–":S.jobs.filter(j=>j.superId===x.id).length)+'</td><td>'+(x.lastSeen?esc(new Date(x.lastSeen).toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})):'<span class="muted">Never</span>')+'</td><td><button class="btn sm" data-relink="'+x.id+'">New sign-in link</button></td></tr>').join("")+'</tbody></table></div>';
   $("#app").innerHTML=h;$("#addsup").onclick=addSuper;
   document.querySelectorAll("[data-relink]").forEach(b=>b.onclick=()=>{const x=S.supers.find(s=>s.id===b.dataset.relink);
     modal('<h2>New sign-in link for '+esc(x.name)+'?</h2><p class="muted">'+(x.id===S.me.id?"Your current link and code stop working, and this iPad switches to the new one.":"Their old link and code stop working. Use this if they lost it or it was shared with the wrong person. They’ll need the new link on each device.")+'</p><div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="rl-go">Make new link</button></div>',
@@ -855,10 +933,13 @@ function showLink(name,code){const link=signLink(code);
     const sh=$("#sh");sh&&(sh.onclick=()=>navigator.share({title:"Haggerty Look-Ahead",text:name+", here’s your look-ahead sign-in link:",url:link}).catch(()=>{}));
     document.querySelector("[data-close]").addEventListener("click",()=>{if(S.view==="team")renderTeam()})})}
 function addSuper(){
-  modal('<h2>Add a super</h2><label class="field"><span>Name</span><input type="text" id="as-name" placeholder="First and last name"></label><label class="chk"><input type="checkbox" id="as-admin"> Admin (sees every super’s jobs)</label>'+
+  modal('<h2>Add a person</h2><label class="field"><span>Name</span><input type="text" id="as-name" placeholder="First and last name"></label>'+
+    '<label class="field"><span>What they do here</span><select id="as-role"><option value="super">Super: updates their own jobs</option><option value="viewer">Leader: view-only overview</option><option value="admin">Admin: sets up jobs and people</option></select></label>'+
+    '<label class="field" id="as-scope-f" hidden><span>Which jobs they see</span><select id="as-scope"><option value="all">All jobs</option><option value="com">Commercial jobs</option><option value="res">Restoration jobs</option></select></label>'+
     '<div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="as-go">Create sign-in link</button></div>',
-  close=>{$("#as-go").onclick=async()=>{const name=$("#as-name").value.trim();if(!name){$("#as-name").focus();return}
-    try{const code=await rpc("la_add_super",{p_code:S.code,p_name:name,p_is_admin:$("#as-admin").checked});showLink(name,code)}
+  close=>{$("#as-role").onchange=e=>{$("#as-scope-f").hidden=e.target.value!=="viewer"};
+    $("#as-go").onclick=async()=>{const name=$("#as-name").value.trim();if(!name){$("#as-name").focus();return}const role=$("#as-role").value;
+    try{const code=await rpc("la_add_person",{p_code:S.code,p_name:name,p_role:role,p_scope:role==="viewer"?$("#as-scope").value:"all"});showLink(name,code)}
     catch(e){toast(e.message)}}})}
 
 function renderLogin(msg){
@@ -874,25 +955,25 @@ function renderLogin(msg){
 }
 async function signIn(c){const me=await rpc("la_login",{p_code:c});S.me=me;S.code=c;S.demo=false;ls.set(CODEKEY,c);ls.set(KEY+":me",JSON.stringify(me));setLinkHash(c);await startSignedIn()}
 function chrome(){
-  const inApp=!!S.me;$("#nav").hidden=!inApp;$("#who").hidden=!inApp;$("#navteam").hidden=!(S.me&&S.me.isAdmin);
+  const inApp=!!S.me;$("#nav").hidden=!inApp;$("#who").hidden=!inApp;$("#navteam").hidden=!(S.me&&S.me.isAdmin);$("#navover").hidden=!(S.me&&canLead()&&!S.demo);
   if(inApp){$("#who").textContent=S.demo?"Demo · Sign in":S.me.name;}
-  const nd=document.querySelector('[data-nav="dash"]');nd.textContent=S.me&&!isAdmin()?"My jobs":"All jobs";
+  const nd=document.querySelector('[data-nav="dash"]');nd.textContent=S.me&&!canLead()?"My jobs":"All jobs";
   document.querySelector('[data-nav="sheets"]').textContent="Print sheets";
   setSync("","Saved")}
 function signOut(msg){S.me=null;S.code=null;S.demo=false;S.jobs=[];S.synced={};S.archived=[];ls.del(CODEKEY);ls.del(KEY+":me");setLinkHash("");S.view="dash";renderLogin(msg)}
 $("#who").onclick=()=>{if(S.demo){signOut();return}
   modal('<h2>'+esc(S.me.name)+'</h2><p class="muted">'+(pending()?'Some changes haven’t reached the server yet. Signing out now would lose them.':'Everything is saved.')+'</p><p class="muted">Your sign-in code is <b class="num">'+esc(S.code)+'</b>. Keep it in case the app ever asks.</p><div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn danger" id="so">Sign out</button></div>',c=>{$("#so").onclick=()=>{c();signOut()}})};
 async function startSignedIn(){
-  loadCache();chrome();go("dash");
+  loadCache();chrome();go(isViewer()?"over":"dash");
   try{await pull();render()}catch(e){if(/access code/i.test(e.message)){signOut("That access code no longer works.");return}setSync("off","No signal · showing saved copy")}
 }
 function render(){
   document.querySelectorAll("[data-nav]").forEach(b=>b.setAttribute("aria-current",String(b.dataset.nav===S.view)));
   if(!S.me){renderLogin();return}
-  if(S.view==="job")renderJob();else if(S.view==="sheets")renderSheets();else if(S.view==="team")renderTeam();else renderDash();
+  if(S.view==="job")renderJob();else if(S.view==="sheets")renderSheets();else if(S.view==="team")renderTeam();else if(S.view==="over"&&canLead())renderOver();else renderDash();
 }
-document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>go(b.dataset.nav,b.dataset.nav==="sheets"?{sheetIds:null}:{}));
-$("#home").onclick=()=>{if(S.me)go("dash")};
+document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>go(b.dataset.nav,b.dataset.nav==="sheets"?{sheetIds:null}:b.dataset.nav==="dash"?{superFilter:"all"}:{}));
+$("#home").onclick=()=>{if(S.me)go(isViewer()?"over":"dash")};
 loadPrefs();
 (function boot(){const c=ls.get(CODEKEY);let me=null;try{me=JSON.parse(ls.get(KEY+":me")||"null")}catch(e){}
   /* personal sign-in link: …/#k=CODE */

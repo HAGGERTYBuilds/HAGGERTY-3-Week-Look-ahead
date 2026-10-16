@@ -24,6 +24,16 @@ It blends the two existing templates:
 - Admins see every job, create, import and delete jobs, and pick the super on each job.
 - Each super gets a personal sign-in link (`…/#k=CODE`). Tapping it signs them in; the 8-letter code in it also works on the sign-in screen. Supers can't create or delete jobs, and the job header (Job #, name, PM/CM, super) is read-only for them.
 
+## Leadership overview (view only)
+
+People added as **Leader** see an Overview page and can open any job in their scope without changing it. The scope is set per person: all jobs, commercial jobs, or restoration jobs. Hugo (VP) sees all jobs, David Booth (general superintendent, commercial) sees commercial, and Eugene (general superintendent, restoration) sees restoration. Admins see the Overview too.
+
+The Overview shows active jobs, how many look-aheads were sent this week, critical items in the next 7 days, and jobs not updated in 7+ days. It also has a commercial vs restoration split (company view only), a workload grid with one row per super showing how many tasks they have running each day, the critical items coming up in the next 2 weeks, and the jobs that still need sending or updating.
+
+## Printing
+
+Printed sheets default to 3 weeks from this Monday, whatever the screen shows. Only tasks with work in those weeks print (with their section headings), and the print screen lets you change the weeks (1-4) or include every task.
+
 ## Importing existing schedules
 
 Admins tap **Import schedule** and pick a file. A preview shows the job name, Job #, type, which super it goes to, and how many tasks were found, before anything is saved.
@@ -58,6 +68,7 @@ Supabase "3-week-Lookahead" project: la_* functions → la_jobs, la_tasks, la_su
 | `index.html` | The whole app |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Offline support and the home-screen icon |
 | `sql/01_lookahead_schema.sql` | Tables and functions (already applied to the 3-week-Lookahead project) |
+| `sql/02_roles_dashboards.sql` | Roles (super / admin / view-only leader) and scopes for the Overview (applied) |
 
 ## Adding supers
 

@@ -131,6 +131,7 @@ declare
   j public.la_jobs;
   t jsonb; i int := 0;
 begin
+  if s.role = 'viewer' then raise exception 'View-only access' using errcode = '42501'; end if;
   select super_id into v_owner from public.la_jobs where id = v_id;
   if v_owner is not null and v_owner <> s.id and not s.is_admin then
     raise exception 'That job belongs to another super' using errcode = '42501';
