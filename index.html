@@ -255,6 +255,9 @@ table.plain th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color
 .lst{list-style:none;margin:0;padding:0}.lst li{display:flex;gap:10px;align-items:baseline;padding:8px 2px;border-bottom:1px solid var(--line)}
 .lst .dt{font-weight:700;min-width:84px;font-variant-numeric:tabular-nums}.lst button{all:unset;cursor:pointer;font-weight:600}.lst button:hover{text-decoration:underline}
 .warn{color:#B4540C;font-weight:600}
+a.btn{text-decoration:none;color:inherit}
+.row>.field{flex:1}
+table.trips td.r,table.trips th.r{text-align:right}table.trips td.num,table.trips td.r{white-space:nowrap}table.trips tbody tr{cursor:pointer}table.trips tbody tr:hover td{background:var(--surface-2)}
 .code{font-family:ui-monospace,Menlo,monospace;font-size:22px;letter-spacing:.2em;font-weight:700;background:var(--surface-2);padding:10px 14px;border-radius:8px;text-align:center;user-select:all}
 </style>
 </head>
@@ -269,6 +272,7 @@ table.plain th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color
     <button data-nav="dash">All jobs</button>
     <button data-nav="job">Job look-ahead</button>
     <button data-nav="sheets">Look-ahead sheets</button>
+    <button data-nav="miles">Mileage</button>
     <button data-nav="team" id="navteam" hidden>Team</button>
   </nav>
   <span class="sync" id="sync" hidden><i></i><span>Saved</span></span>
@@ -957,6 +961,133 @@ function addSuper(){
     try{const code=await rpc("la_add_person",{p_code:S.code,p_name:name,p_role:role,p_scope:role==="viewer"?$("#as-scope").value:role==="super"?$("#as-div").value:"all"});showLink(name,code)}
     catch(e){toast(e.message)}}})}
 
+/* ---------- Mileage reimbursement ----------
+   Each person logs their own trips (saved to the server, kept on the iPad until it gets there).
+   Print fills the company Mileage Reimbursement Form PDF, 20 trips a page, each page with its own totals. */
+const RATE=0.70,ROWS=20,FORM_PDF="forms/mileage-reimbursement-2026.pdf",PDFLIB_SRC="vendor/pdf-lib.min.js";
+const M={key:null,trips:[],dirty:[],pulled:false,month:TODAY.slice(0,7)};
+const tripKey=()=>cacheKey()+":trips";
+function loadTrips(){M.trips=[];M.dirty=[];M.pulled=false;try{const d=JSON.parse(ls.get(tripKey())||"null");if(d){M.trips=d.trips||[];M.dirty=d.dirty||[]}}catch(e){}}
+function persistTrips(){ls.set(tripKey(),JSON.stringify({trips:M.trips,dirty:M.dirty}))}
+const num=v=>{if(v==null||v==="")return null;const n=parseFloat(String(v).replace(/[,$\s]/g,""));return isFinite(n)?n:null};
+const round=(n,d)=>Math.round(n*Math.pow(10,d))/Math.pow(10,d);
+const money=n=>"$"+round(n||0,2).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,",");
+const mi=n=>round(+n||0,1).toLocaleString("en-US");
+const odo=n=>n==null||n===""?"":(+n).toLocaleString("en-US",{maximumFractionDigits:1});
+const mdy=s=>{const d=p(s);return (d.getMonth()+1)+"/"+d.getDate()+"/"+d.getFullYear()};
+const tripCost=t=>round((+t.miles||0)*(t.rate==null?RATE:+t.rate),2);
+const tripDesc=t=>[t.job,t.notes].filter(Boolean).join(" – ");
+const tripSort=(a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.at||0)-(b.at||0);
+const liveTrips=()=>M.trips.filter(t=>!t.removed).sort(tripSort);
+const jobLabel=j=>[j.number,j.name].filter(Boolean).join(" ");
+const monthEnd=m=>add(add(m+"-01",32).slice(0,7)+"-01",-1);
+const monthName=m=>MONTHS[+m.slice(5)-1]+" "+m.slice(0,4);
+function saveTrip(t){const i=M.trips.findIndex(x=>x.id===t.id);if(i<0)M.trips.push(t);else M.trips[i]=t;if(!M.dirty.includes(t.id))M.dirty.push(t.id);persistTrips();syncTrips()}
+let tripSyncing=false,tripTimer=null;
+async function syncTrips(){
+  if(tripSyncing||S.demo||!S.code)return;tripSyncing=true;clearTimeout(tripTimer);
+  try{while(M.dirty.length){const id=M.dirty[0],t=M.trips.find(x=>x.id===id);if(!t){M.dirty.shift();continue}
+      const sent=JSON.stringify(t);await rpc("la_save_trip",{p_code:S.code,p_trip:t});
+      const now=M.trips.find(x=>x.id===id);if(now&&JSON.stringify(now)!==sent)continue; /* edited while sending: send again */
+      M.dirty.shift();if(t.removed)M.trips=M.trips.filter(x=>x.id!==id);persistTrips()}
+  }catch(e){if(/access code/i.test(e.message)){tripSyncing=false;signOut("Your access code no longer works. Ask Liam for a new one.");return}tripTimer=setTimeout(syncTrips,15000)}
+  finally{tripSyncing=false}}
+window.addEventListener("online",()=>{if(M.dirty.length)syncTrips()});
+async function pullTrips(){const server=await rpc("la_get_trips",{p_code:S.code})||[];
+  /* trips not yet on the server win over the server copy */
+  const mine=M.trips.filter(t=>M.dirty.includes(t.id));
+  M.trips=server.reverse().map((t,i)=>({...t,at:i})).filter(t=>!mine.some(x=>x.id===t.id)).concat(mine);persistTrips();if(M.dirty.length)syncTrips()}
+function renderMiles(){
+  if(M.key!==tripKey()){M.key=tripKey();loadTrips()}
+  if(!M.pulled&&!S.demo&&S.code){M.pulled=true;pullTrips().then(()=>{if(S.view==="miles")renderMiles()}).catch(()=>{M.pulled=false})}
+  const ts=liveTrips().filter(t=>t.date.slice(0,7)===M.month),miles=ts.reduce((n,t)=>n+(+t.miles||0),0),amt=ts.reduce((n,t)=>n+tripCost(t),0);
+  let h='<div class="row"><div><div class="eyebrow">'+esc(S.me.name)+' · '+money(RATE)+' a mile</div><h1>Mileage reimbursement</h1></div><span class="spacer"></span>'+
+    '<button class="btn" id="mprint">Print form…</button><button class="btn primary big" id="madd">+ Add trip</button></div>'+
+    '<div class="toolbar"><div class="seg" role="group" aria-label="Month"><button data-mm="-1">‹</button><button data-mm="0" aria-pressed="true">'+monthName(M.month)+'</button><button data-mm="1">›</button></div>'+
+    (M.dirty.length&&!S.demo?'<span class="hint">'+M.dirty.length+' trip'+(M.dirty.length===1?"":"s")+' saved on this device, not sent yet</span>':'')+'</div>'+
+    '<div class="tiles"><div class="tile"><span>Trips</span><b class="num">'+ts.length+'</b></div><div class="tile"><span>Miles</span><b class="num">'+mi(miles)+'</b></div><div class="tile"><span>Reimbursement</span><b class="num">'+money(amt)+'</b></div></div>';
+  if(!ts.length)h+='<div class="panel" style="padding:18px"><p class="muted" style="margin:0">No trips in '+monthName(M.month)+' yet. Tap <b>+ Add trip</b> after each drive. When the month is done, tap <b>Print form…</b> to fill in the company mileage form.</p></div>';
+  else h+='<div class="scroller"><table class="plain trips"><thead><tr><th>Date</th><th>From</th><th>To</th><th>Job / notes</th><th class="r">Odometer</th><th class="r">Miles</th><th class="r">Amount</th></tr></thead><tbody>'+
+    ts.map(t=>'<tr data-trip="'+t.id+'"><td class="num">'+fmt(t.date)+'</td><td>'+esc(t.from)+'</td><td>'+esc(t.to)+'</td><td>'+esc(tripDesc(t))+'</td><td class="r num muted">'+(t.odoStart!=null||t.odoEnd!=null?odo(t.odoStart)+' – '+odo(t.odoEnd):'')+'</td><td class="r num">'+mi(t.miles)+'</td><td class="r num">'+money(tripCost(t))+'</td></tr>').join("")+
+    '</tbody></table></div><p class="hint" style="margin-top:8px">Tap a trip to change or delete it.</p>';
+  $("#app").innerHTML=h;
+  document.querySelectorAll("[data-mm]").forEach(b=>b.onclick=()=>{const n=+b.dataset.mm;M.month=n?add(M.month+"-15",n*30).slice(0,7):TODAY.slice(0,7);render()});
+  $("#madd").onclick=()=>tripDialog(null);$("#mprint").onclick=()=>printMilesDialog();
+  document.querySelectorAll("[data-trip]").forEach(r=>r.onclick=()=>tripDialog(M.trips.find(t=>t.id===r.dataset.trip)));
+}
+function tripDialog(t,preset){
+  const isNew=!t,last=liveTrips().sort((a,b)=>(a.at||0)-(b.at||0)).slice(-1)[0]; /* the trip entered last */
+  t=t?{...t}:Object.assign({id:uid(),date:TODAY.slice(0,7)===M.month?TODAY:M.month+"-01",from:last?last.to:"",to:"",jobId:null,job:"",notes:"",odoStart:last&&last.odoEnd!=null?last.odoEnd:null,odoEnd:null,miles:0,rate:RATE,at:Date.now()},preset||{});
+  const places=[...new Set(liveTrips().reverse().flatMap(x=>[x.to,x.from]).filter(Boolean))].slice(0,40);
+  const jobs=S.jobs.filter(j=>jobLabel(j));
+  const inp=(id,label,val,extra)=>'<label class="field"><span>'+label+'</span><input type="text" id="'+id+'" value="'+esc(val==null?"":val)+'"'+(extra||"")+'></label>';
+  modal('<h2>'+(isNew?"Add a trip":"Trip on "+fmtLong(t.date))+'</h2>'+
+    '<label class="field"><span>Date</span><input type="date" id="t-date" value="'+t.date+'"></label>'+
+    inp("t-from","Starting location",t.from,' list="t-places" autocomplete="off"')+inp("t-to","Destination address",t.to,' list="t-places" autocomplete="off"')+
+    '<datalist id="t-places">'+places.map(x=>'<option value="'+esc(x)+'">').join("")+'</datalist>'+
+    '<label class="field"><span>Job</span><select id="t-job"><option value="">No job</option>'+jobs.map(j=>'<option value="'+j.id+'"'+(j.id===t.jobId?" selected":"")+'>'+esc(jobLabel(j))+'</option>').join("")+
+      (t.jobId&&!jobs.some(j=>j.id===t.jobId)||(!t.jobId&&t.job)?'<option value="keep" selected>'+esc(t.job)+'</option>':'')+'</select></label>'+
+    inp("t-notes","What for (optional)",t.notes,' placeholder="Pick up materials, site walk…"')+
+    '<div class="row" style="flex-wrap:nowrap">'+inp("t-os","Odometer start",t.odoStart,' inputmode="decimal"')+inp("t-oe","Odometer end",t.odoEnd,' inputmode="decimal"')+'</div>'+
+    inp("t-mi","Miles",t.miles||"",' inputmode="decimal"')+
+    '<p class="hint" id="t-sum" style="margin:0"></p><div id="t-err" class="err" hidden></div>'+
+    '<div class="row">'+(isNew?'':'<button class="btn danger" id="t-del">Delete</button>')+'<span class="spacer"></span><button class="btn" data-close>Cancel</button>'+
+    '<button class="btn" id="t-ret">Save + return trip</button><button class="btn primary" id="t-save">Save trip</button></div>',
+  close=>{
+    const os=$("#t-os"),oe=$("#t-oe"),m=$("#t-mi");
+    const upd=()=>{const a=num(os.value),b=num(oe.value);if(a!=null&&b!=null&&b>=a)m.value=String(round(b-a,1));m.readOnly=a!=null&&b!=null;
+      const n=num(m.value)||0;$("#t-sum").textContent=n?mi(n)+" miles × "+money(RATE)+" = "+money(n*RATE):"Enter both odometer readings, or just the miles."};
+    os.oninput=oe.oninput=m.oninput=upd;upd();
+    const collect=()=>{const er=$("#t-err"),a=num(os.value),b=num(oe.value),miles=num(m.value),js=$("#t-job").value,j=S.jobs.find(x=>x.id===js);
+      const fail=msg=>{er.hidden=false;er.textContent=msg;return null};
+      if(!$("#t-date").value)return fail("Pick the date of the trip.");
+      if(a!=null&&b!=null&&b<a)return fail("The odometer end is lower than the start.");
+      if(!miles||miles<=0)return fail("Enter the miles, or both odometer readings.");
+      return {...t,date:$("#t-date").value,from:$("#t-from").value.trim(),to:$("#t-to").value.trim(),
+        jobId:j?j.id:js==="keep"?t.jobId:null,job:j?jobLabel(j):js==="keep"?t.job:"",notes:$("#t-notes").value.trim(),
+        odoStart:a,odoEnd:b,miles:round(miles,1),rate:t.rate==null?RATE:t.rate}};
+    const done=x=>{saveTrip(x);M.month=x.date.slice(0,7);close();render()};
+    $("#t-save").onclick=()=>{const x=collect();if(x){done(x);toast("Trip saved")}};
+    $("#t-ret").onclick=()=>{const x=collect();if(!x)return;done(x);
+      tripDialog(null,{date:x.date,from:x.to,to:x.from,jobId:x.jobId,job:x.job,notes:x.notes,odoStart:x.odoEnd,odoEnd:null,miles:x.odoEnd==null?x.miles:0})};
+    const d=$("#t-del");d&&(d.onclick=()=>{saveTrip({...t,removed:true});close();render();toast("Trip deleted")});
+  })}
+let pdfLibP=null;
+function loadPDFLib(){if(window.PDFLib)return Promise.resolve(window.PDFLib);
+  return pdfLibP=pdfLibP||new Promise((ok,no)=>{const sc=document.createElement("script");sc.src=PDFLIB_SRC;sc.onload=()=>ok(window.PDFLib);sc.onerror=()=>{pdfLibP=null;no(new Error("Couldn’t load the form. Check your connection and try again."))};document.head.appendChild(sc)})}
+/* Fills the form's own fields, then flattens each page so it prints the same everywhere. */
+async function mileagePDF(trips,name){
+  const PL=await loadPDFLib(),r=await fetch(FORM_PDF);if(!r.ok)throw new Error("Couldn’t load the form. Check your connection and try again.");
+  const tpl=await r.arrayBuffer(),out=await PL.PDFDocument.create();
+  for(let i=0;i<trips.length;i+=ROWS){const doc=await PL.PDFDocument.load(tpl),f=doc.getForm(),part=trips.slice(i,i+ROWS);
+    const set=(n,v)=>{try{f.getTextField(n).setText(v==null?"":String(v))}catch(e){}};
+    set("Employee Name",name);
+    /* every row gets a value (blank ones too) so each field has a clean appearance when flattened */
+    for(let n=1;n<=ROWS;n++)["DateRow","Starting LocationRow","Destination AddressRow","DescriptionNotesRow","Odometer StartRow","Odometer EndRow","MileageRow","ExpenseRow"].forEach(c=>set(c+n,""));
+    part.forEach((t,k)=>{const n=k+1;set("DateRow"+n,mdy(t.date));set("Starting LocationRow"+n,t.from);set("Destination AddressRow"+n,t.to);set("DescriptionNotesRow"+n,tripDesc(t));
+      set("Odometer StartRow"+n,odo(t.odoStart));set("Odometer EndRow"+n,odo(t.odoEnd));set("MileageRow"+n,mi(t.miles));set("ExpenseRow"+n,money(tripCost(t)))});
+    set("0575Row1",mi(part.reduce((n,t)=>n+(+t.miles||0),0)));set("0575Row2",money(part.reduce((n,t)=>n+tripCost(t),0)));
+    f.updateFieldAppearances(await doc.embedFont(PL.StandardFonts.Helvetica));f.flatten();
+    (await out.copyPages(doc,doc.getPageIndices())).forEach(pg=>out.addPage(pg))}
+  out.setTitle("Mileage Reimbursement – "+name);return out.save()}
+function printMilesDialog(){
+  const from0=M.month+"-01",to0=monthEnd(M.month);
+  modal('<h2>Print mileage form</h2><p class="muted" style="margin:0">Fills in the company Mileage Reimbursement Form with your trips. Each page holds 20 trips and has its own totals.</p>'+
+    '<div class="row" style="flex-wrap:nowrap"><label class="field"><span>From</span><input type="date" id="pm-a" value="'+from0+'"></label><label class="field"><span>To</span><input type="date" id="pm-b" value="'+to0+'"></label></div>'+
+    '<p class="hint" id="pm-sum" style="margin:0"></p><div id="pm-out" class="row"></div>'+
+    '<div class="row"><span class="spacer"></span><button class="btn" data-close>Close</button><button class="btn primary" id="pm-go">Make the form</button></div>',
+  close=>{const pick=()=>{const a=$("#pm-a").value,b=$("#pm-b").value;return liveTrips().filter(t=>t.date>=a&&t.date<=b)};
+    const upd=()=>{const ts=pick(),pages=Math.ceil(ts.length/ROWS);$("#pm-out").innerHTML="";$("#pm-go").hidden=false;
+      $("#pm-sum").textContent=ts.length?ts.length+" trip"+(ts.length===1?"":"s")+", "+mi(ts.reduce((n,t)=>n+(+t.miles||0),0))+" miles, "+money(ts.reduce((n,t)=>n+tripCost(t),0))+" · "+pages+" page"+(pages===1?"":"s"):"No trips in these dates."};
+    $("#pm-a").onchange=$("#pm-b").onchange=upd;upd();
+    $("#pm-go").onclick=async()=>{const ts=pick(),b=$("#pm-go");if(!ts.length){toast("No trips in these dates");return}
+      b.disabled=true;b.textContent="Filling in…";
+      try{const bytes=await mileagePDF(ts,S.me.name),url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
+        const file="Mileage "+$("#pm-a").value+" to "+$("#pm-b").value+" - "+S.me.name+".pdf";
+        $("#pm-out").innerHTML='<a class="btn primary big" href="'+url+'" target="_blank" rel="noopener">Open to print</a><a class="btn big" href="'+url+'" download="'+esc(file)+'">Save PDF</a>';
+        $("#pm-sum").textContent+=" · Ready. Sign it, and have your manager sign, after printing.";b.hidden=true}
+      catch(e){toast(e.message)}finally{b.disabled=false;b.textContent="Make the form"}}})}
+
 function renderLogin(msg){
   $("#app").innerHTML='<form class="login panel" id="lf" style="padding:24px"><div class="eyebrow">Superintendent sign-in</div><h1>3-Week Look-Ahead</h1>'+
     '<p class="muted" style="margin:0">Open the sign-in link Liam texted you, or type the 8-letter code from it here. You only do this once on each iPad.</p>'+
@@ -985,7 +1116,7 @@ async function startSignedIn(){
 function render(){
   document.querySelectorAll("[data-nav]").forEach(b=>b.setAttribute("aria-current",String(b.dataset.nav===S.view)));
   if(!S.me){renderLogin();return}
-  if(S.view==="job")renderJob();else if(S.view==="sheets")renderSheets();else if(S.view==="team")renderTeam();else if(S.view==="over"&&canLead())renderOver();else renderDash();
+  if(S.view==="job")renderJob();else if(S.view==="sheets")renderSheets();else if(S.view==="team")renderTeam();else if(S.view==="miles")renderMiles();else if(S.view==="over"&&canLead())renderOver();else renderDash();
 }
 document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>go(b.dataset.nav,b.dataset.nav==="sheets"?{sheetIds:null}:b.dataset.nav==="dash"?{superFilter:"all"}:{}));
 $("#home").onclick=()=>{if(S.me)go(isViewer()?"over":"dash")};
