@@ -52,14 +52,6 @@ Admins tap **Import schedule** and pick a file. A preview shows the job name, Jo
 
 Supers sign in once per iPad. Without a code, "Try it with sample jobs" opens a demo that saves nothing to the server.
 
-## Mileage reimbursement
-
-Everyone signed in has a **Mileage** tab. Tap **+ Add trip** after each drive: date, starting location, destination, job (optional), what it was for, and either both odometer readings or just the miles. The next trip starts where the last one ended, and **Save + return trip** fills in the drive back. The tab shows each month's trips, miles and reimbursement at $0.70 a mile.
-
-**Print form…** picks a date range (this month by default) and fills the company Mileage Reimbursement Form (`forms/mileage-reimbursement-2026.pdf`) through its own form fields: 20 trips a page, each page with its own totals. "Open to print" opens the PDF to print; "Save PDF" downloads it. Signatures and dates are left blank for signing by hand. Filling happens on the device with pdf-lib (`vendor/`), so it also works without signal.
-
-Trips are saved to Supabase (`la_trips`, through `la_get_trips` / `la_save_trip`, see `sql/03_mileage.sql`) and kept on the device until they get there. Each person only sees their own trips; deleted trips are flagged, not erased.
-
 ## How it works
 
 ```
