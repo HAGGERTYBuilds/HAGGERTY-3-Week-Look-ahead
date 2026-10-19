@@ -1,7 +1,7 @@
 // Offline shell: serve the app from cache so it opens on a jobsite with no signal.
 // Data calls to Supabase always go to the network; the app keeps its own saved copy.
-const CACHE = "lookahead-v2";
-const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
+const CACHE = "lookahead-v3";
+const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "vendor/pdf-lib.min.js", "forms/mileage-reimbursement-2026.pdf"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
