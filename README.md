@@ -36,6 +36,11 @@ The Overview shows active jobs, how many look-aheads were sent this week, critic
 
 ## Printing
 
+**For the client** (the default) prints in the layout of the general superintendent's weekly update spreadsheet. The client's logo goes top left, the job name and "WEEKLY UPDATE" sit in the middle, and the Haggerty logo goes top right. The columns are Item No. / Responsible / Activity, with day columns grouped by month, gray weekends and X marks. Section rows are blue, and critical items (inspections, deliveries, deadlines) get an orange fill. **Download Excel** makes the same layout as an .xlsx file, one sheet per job with both logos. **Haggerty internal** is the blue/red sheet.
+
+Each job's client name and logo are set on the job page (Client › Add client logo…). Admins and the job's super can change them. The logo is shrunk on the iPad before upload and saved with `la_set_client`.
+
+
 Printed sheets default to 3 weeks from this Monday, whatever the screen shows. Only tasks with work in those weeks print (with their section headings), and the print screen lets you change the weeks (1-4) or include every task.
 
 ## Importing existing schedules
@@ -72,6 +77,7 @@ Supabase "3-week-Lookahead" project: la_* functions → la_jobs, la_tasks, la_su
 | `index.html` | The whole app |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Offline support and the home-screen icon |
 | `sql/01_lookahead_schema.sql` | Tables and functions (already applied to the 3-week-Lookahead project) |
+| `sql/03_client_logo.sql` | Client name and logo per job (applied) |
 | `sql/02_roles_dashboards.sql` | Roles (super / admin / view-only leader) and scopes for the Overview (applied) |
 
 ## Adding supers

@@ -182,6 +182,28 @@ tr.taskrow td{height:28px}
 .legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--ink-2)}
 .legend span{display:inline-flex;gap:6px;align-items:center}
 
+/* Client sheet: mirrors the General Superintendent's weekly update spreadsheet */
+.csheet{width:1056px;background:#fff;color:#111;padding:18px 20px;font-family:"Aptos Narrow","Arial Narrow",var(--f-body);font-size:11.5px}
+.csheet table{border-collapse:collapse;width:100%;table-layout:fixed}
+.csheet th,.csheet td{border:1px solid #000;height:19px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.csheet .chead{display:grid;grid-template-columns:200px 1fr 230px;align-items:center;gap:12px;margin-bottom:8px}
+.csheet .ttl{text-align:center}
+.csheet .clogo{display:flex;align-items:center;justify-content:flex-start;height:92px}
+.csheet .clogo img{max-height:88px;max-width:190px;object-fit:contain}
+.csheet .clogo .ph{font-weight:700;font-size:15px;text-align:left;white-space:normal;line-height:1.15}
+.csheet .ttl{font-weight:800;font-size:26px;letter-spacing:.01em;line-height:1.05;white-space:normal}
+.csheet .ttl small{display:block;font-size:13px;font-weight:600;letter-spacing:.04em;margin-top:6px;color:#333}
+.csheet .hlogo{text-align:right}.csheet .hlogo img{height:52px;width:auto}
+.csheet thead th{font-weight:700;font-size:10.5px;background:#fff}
+.csheet thead tr.cm th{font-size:10px}
+.csheet .we{background:#D9D9D9}
+.csheet tr.sec td{background:#B4CDEB;font-weight:700;text-transform:uppercase}
+.csheet td.x{font-weight:600}.csheet td.cr{background:#FFC000}
+.csheet td.act{text-align:center}
+.csheet tr.lg td{border:1px solid #000;font-weight:600}
+.csheet .foot{display:flex;justify-content:space-between;font-size:10px;color:#444;margin-top:6px}
+.cthumb{height:34px;max-width:110px;object-fit:contain;border:1px solid var(--line);border-radius:6px;background:#fff;padding:2px}
+.clientbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 0}
 /* Paper sheets: deliberately always light, like the printed page */
 .sheets{display:flex;flex-direction:column;gap:22px;align-items:flex-start}
 .sheetwrap{max-width:100%;overflow-x:auto;border-radius:6px;box-shadow:var(--shadow)}
@@ -215,7 +237,8 @@ tr.taskrow td{height:28px}
   .bar,.noprint,.toast{display:none!important}
   main{padding:0;max-width:none}
   .sheetwrap{box-shadow:none;overflow:visible}
-  .sheet{width:100%;page-break-after:always;padding:0}
+  .sheet,.csheet{width:100%;page-break-after:always;padding:0}
+  .sheetwrap:last-child .csheet{page-break-after:auto}
   .sheetwrap:last-child .sheet{page-break-after:auto}
 }
 @media (max-width:640px){h1{font-size:24px}.logo small{display:none}.nav{margin-left:0;width:100%}.nav button{flex:1}}
@@ -281,6 +304,7 @@ table.plain th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color
 (function(){
 "use strict";
 const LOGO='<svg viewBox="0 0 124 124" aria-hidden="true"><rect x="0" y="94" width="30" height="30" fill="#F7943F"/><rect x="47" y="46" width="30" height="30" fill="#F7943F"/><rect x="47" y="94" width="30" height="30" fill="#F7943F"/><rect x="94" y="0" width="30" height="124" fill="#F7943F"/></svg>';
+const HLOGO_PNG="data:image/png;base64,"+"iVBORw0KGgoAAAANSUhEUgAAAZUAAABkCAYAAABO4q0zAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyhpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDkuMS1jMDAyIDc5LmExY2QxMmY0MSwgMjAyNC8xMS8wOC0xNjowOToyMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6MTkwOTUwRUI5NjI5MTFGMEIxMEJGM0FDNDlBNUZEOTkiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6MTkwOTUwRUE5NjI5MTFGMEIxMEJGM0FDNDlBNUZEOTkiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI2LjIgKE1hY2ludG9zaCkiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDpGNjVBQzY3RTdBNEQxMUYwQTUzQ0Q1RUMxMTdDNDZDNyIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDpGNjVBQzY3RjdBNEQxMUYwQTUzQ0Q1RUMxMTdDNDZDNyIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PqcYCl0AAAsRSURBVHja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";
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const MO=MONTHS.map(m=>m.slice(0,3));
 const DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -612,6 +636,7 @@ function renderJob(){
     (divOf(j.superId)?'<div class="ro field"><span>Type</span><b>'+DIV[j.mode]+'</b><small class="hint">set by '+esc(superName(j.superId))+'’s division</small></div>':'<div class="field"><span>Type</span><div class="seg" role="group" aria-label="Job type"><button data-mode="res" aria-pressed="'+(j.mode==="res")+'">Restoration</button><button data-mode="com" aria-pressed="'+(j.mode==="com")+'">Commercial</button></div></div>')+
     '<div class="field"><span>Crew works weekends</span><label class="chk"><input type="checkbox" id="wkend"'+(j.weekends?" checked":"")+'> Count Sat and Sun as workdays</label></div></div>'
     :'<div class="panel jobhead">'+[["Job #",j.number],[j.mode==="com"?"Project":"Name / address",j.name],[L.cm,j.cm],["Super",j.sup||S.me.name]].map(([a,b])=>'<div class="ro field"><span>'+a+'</span><b>'+esc(b||"–")+'</b></div>').join("")+'</div>')+
+    (isViewer()?'':'<div class="clientbar"><span class="hint" style="font-weight:700;letter-spacing:.08em;text-transform:uppercase">Client</span>'+(j.logo?'<img class="cthumb" src="'+esc(j.logo)+'" alt="">':'')+'<span>'+esc(j.client||(j.logo?"":"No client logo yet"))+'</span><button class="btn sm" id="clientbtn">'+(j.logo||j.client?"Change…":"Add client logo…")+'</button><span class="hint">Shows on the client printout.</span></div>')+
     (isViewer()?'<p class="hint">View only. '+esc(j.sup||superName(j.superId)||"The super")+' keeps this look-ahead up to date.</p>':ls.get(KEY+":help")?'':'<div class="help" id="help"><div style="flex:1"><h3>How to update this look-ahead</h3><ol><li>Tap a day box to mark it: once for <b style="color:var(--blue)">blue</b> (work scheduled), twice for <b style="color:var(--red)">red</b> (critical: inspection, delivery, deadline), three times to clear it.</li><li>Tap <b>⋯</b> on a task to move it a day, delete it, or set what it starts after.</li><li>Rain day? Tap <b>Lost day…</b> and everything slides one workday.</li><li>Everything saves by itself, even with no signal.</li></ol></div><button class="btn sm" id="helpx">Got it</button></div>')+
     '<div class="toolbar">'+windowBar()+'<span class="spacer"></span>'+(isViewer()?'</div>':
     '<div class="seg" role="group" aria-label="What a tap does">'+[["cycle","Tap to change"],["B",'<i class="sw b"></i>Blue brush'],["R",'<i class="sw r"></i>Red brush'],["",'Eraser']].map(([v,l])=>'<button data-brush="'+v+'" aria-pressed="'+(S.brush===v)+'">'+l+'</button>').join("")+'</div></div>'+
@@ -636,6 +661,7 @@ function cycle(v){return v==="B"?"R":v==="R"?"":"B"}
 function bindJob(j){
   bindWindow();
   const jp=$("#jobpick");jp&&(jp.onchange=e=>go("job",{jobId:e.target.value}));
+  const cb=$("#clientbtn");cb&&(cb.onclick=()=>clientDialog(j));
   const hx=$("#helpx");hx&&(hx.onclick=()=>{ls.set(KEY+":help","1");$("#help").remove()});
   const js=$("#jsuper");js&&(js.onchange=()=>{j.superId=js.value||null;j.sup=superName(j.superId);const d=divOf(j.superId);const ch=d&&d!==j.mode;if(d)j.mode=d;save();
     toast("Assigned to "+j.sup+(ch?" · now "+DIV[d]:""));render()});
@@ -858,6 +884,28 @@ function importPreview(r){
       const st=j.tasks.map(tStart).filter(x=>x&&x>=mondayOf(TODAY)).sort()[0];if(st&&st>add(S.start,S.weeks*7-1))S.start=mondayOf(st);
       go("job",{jobId:j.id});toast("Imported "+j.tasks.filter(t=>!t.sec).length+" tasks")}})}
 
+/* ---------- Client name and logo for client printouts ---------- */
+function shrinkImage(file){return new Promise((ok,no)=>{const rd=new FileReader();rd.onerror=()=>no(new Error("Couldn’t read that image."));
+  rd.onload=()=>{const im=new Image();im.onerror=()=>no(new Error("That file isn’t an image the iPad can read. Try a PNG or JPG."));
+    im.onload=()=>{let sc=Math.min(1,600/im.width,300/im.height),out="";
+      for(let k=0;k<4;k++){const c=document.createElement("canvas");c.width=Math.max(1,Math.round(im.width*sc));c.height=Math.max(1,Math.round(im.height*sc));
+        c.getContext("2d").drawImage(im,0,0,c.width,c.height);out=/png|svg|gif|webp/i.test(file.type)?c.toDataURL("image/png"):c.toDataURL("image/jpeg",.88);
+        if(out.length<380000)return ok(out);sc*=.7}
+      no(new Error("That logo is too large. Try a smaller image."))};im.src=rd.result};rd.readAsDataURL(file)})}
+function clientDialog(j){let logo=j.logo||"";
+  const prev=()=>logo?'<img src="'+esc(logo)+'" alt="" style="max-height:90px;max-width:220px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff;padding:4px">':'<span class="muted">No logo</span>';
+  modal('<h2>Client on this job</h2><label class="field"><span>Client name</span><input type="text" id="cl-name" value="'+esc(j.client||"")+'" placeholder="e.g. University of the Pacific"></label>'+
+    '<div class="field"><span>Client logo</span><div class="row" style="align-items:center"><div id="cl-prev">'+prev()+'</div><span class="spacer"></span>'+
+    '<label class="btn" style="position:relative">Choose image…<input type="file" id="cl-file" class="vh" accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp"></label>'+(logo?'<button class="btn ghost danger" id="cl-del">Remove</button>':'')+'</div></div>'+
+    '<p class="hint" style="margin:0">It prints in the top-left corner of the client printout. PNG or JPG works best.</p><div id="cl-err" class="err" hidden></div>'+
+    '<div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="cl-go">Save</button></div>',
+  close=>{const err=m=>{const e=$("#cl-err");e.textContent=m;e.hidden=!m};
+    $("#cl-file").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{logo=await shrinkImage(f);$("#cl-prev").innerHTML=prev();err("")}catch(x){err(x.message)}};
+    const d=$("#cl-del");d&&(d.onclick=()=>{logo="";$("#cl-prev").innerHTML=prev()});
+    $("#cl-go").onclick=async()=>{const name=$("#cl-name").value.trim();const b=$("#cl-go");b.disabled=true;b.textContent="Saving…";
+      try{if(!S.demo)await rpc("la_set_client",{p_code:S.code,p_job_id:j.id,p_client:name,p_logo:logo});j.client=name;j.logo=logo;persist();close();render();toast("Client saved")}
+      catch(x){b.disabled=false;b.textContent="Save";err(navigator.onLine===false?"Saving the logo needs a signal. Try again when you’re connected.":x.message)}}})}
+
 /* ---------- Look-ahead sheets ---------- */
 function pickSheets(){
   if(!P.start)P.start=mondayOf(TODAY);
@@ -865,7 +913,7 @@ function pickSheets(){
     '<div class="row"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="sjgo">Create sheets</button></div>',
   close=>{$("#sjgo").onclick=()=>{const ids=[...document.querySelectorAll(".sj:checked")].map(i=>i.value);close();go("sheets",{sheetIds:ids})}})}
 /* Printing has its own window: 3 weeks from this Monday unless changed here, and only the tasks with work in it */
-const P={start:null,weeks:3,all:false};
+const P={start:null,weeks:3,all:false,style:(ls.get(KEY+":pstyle")==="int"?"int":"client")};
 const pDays=()=>{const out=[];for(let i=0;i<P.weeks*7;i++){const d=add(P.start,i);if(S.hideWE&&isWE(d))continue;out.push(d)}return out};
 const pRange=()=>fmt(P.start)+" – "+fmt(add(P.start,P.weeks*7-1))+", "+p(add(P.start,P.weeks*7-1)).getFullYear();
 function printRows(j,ds){if(P.all)return j.tasks;const a=ds[0],b=ds[ds.length-1],out=[];let sec=null;
@@ -878,13 +926,75 @@ function renderSheets(){
     '<div class="toolbar"><div class="seg" role="group" aria-label="Which weeks"><button data-pw="-1">‹ Week</button><button data-pw="0">This week</button><button data-pw="1">Week ›</button></div>'+
     '<div class="seg" role="group" aria-label="How many weeks">'+[1,2,3,4].map(n=>'<button data-pn="'+n+'" aria-pressed="'+(P.weeks===n)+'">'+n+' week'+(n>1?"s":"")+'</button>').join("")+'</div>'+
     '<label class="chk"><input type="checkbox" id="pall"'+(P.all?" checked":"")+'> Also print tasks with no work these weeks</label></div>'+
+    '<div class="toolbar"><div class="seg" role="group" aria-label="Sheet style"><button data-ps="client" aria-pressed="'+(P.style==="client")+'">For the client</button><button data-ps="int" aria-pressed="'+(P.style==="int")+'">Haggerty internal (blue / red)</button></div>'+
+    '<button class="btn" id="xlsx">Download Excel</button></div>'+
     '<p class="hint">'+(P.all?"Printing all "+total+" tasks.":"Printing the "+shown+" task"+(shown===1?"":"s")+" with work in these weeks"+(total>shown?" (of "+total+")":"")+".")+' Each job starts on a new letter-landscape page. On iPad, Print opens the share sheet where you can print or save a PDF.</p></div><div class="sheets">';
-  ids.forEach((id,i)=>h+='<div class="sheetwrap">'+sheetHTML(job(id),ds,i+1,ids.length)+'</div>');
+  ids.forEach((id,i)=>h+='<div class="sheetwrap">'+(P.style==="client"?clientSheetHTML(job(id),ds):sheetHTML(job(id),ds,i+1,ids.length))+'</div>');
   $("#app").innerHTML=h+'</div>';$("#back").onclick=()=>S.sheetIds&&S.sheetIds.length===1?go("job",{jobId:S.sheetIds[0]}):go(isViewer()?"over":"dash");$("#pick").onclick=()=>pickSheets();$("#print").onclick=()=>window.print();
   document.querySelectorAll("[data-pw]").forEach(b=>b.onclick=()=>{const w=+b.dataset.pw;P.start=w?add(P.start,7*w):mondayOf(TODAY);render()});
   document.querySelectorAll("[data-pn]").forEach(b=>b.onclick=()=>{P.weeks=+b.dataset.pn;render()});
   $("#pall").onchange=e=>{P.all=e.target.checked;render()};
+  document.querySelectorAll("[data-ps]").forEach(b=>b.onclick=()=>{P.style=b.dataset.ps;ls.set(KEY+":pstyle",P.style);render()});
+  $("#xlsx").onclick=()=>downloadXlsx(ids.map(job),ds);
 }
+/* rows for the client layout: item numbers run through sections and tasks, like the weekly update sheet */
+function clientRows(j,ds){let n=0;return printRows(j,ds).map(t=>({t,n:++n}))}
+function monthRuns(ds){const out=[];let i=0;while(i<ds.length){const m=p(ds[i]).getMonth();let c=0;while(i+c<ds.length&&p(ds[i+c]).getMonth()===m)c++;out.push({m,c});i+=c}return out}
+function clientSheetHTML(j,ds){
+  const L=labels(j),W=Math.max(18,Math.min(30,Math.floor(620/ds.length)));
+  let h='<article class="csheet"><div class="chead"><div class="clogo">'+(j.logo?'<img src="'+esc(j.logo)+'" alt="'+esc(j.client||"Client")+'">':'<div class="ph">'+esc(j.client||"")+'</div>')+'</div>'+
+    '<div class="ttl">'+esc((j.name||"").toUpperCase())+' WEEKLY UPDATE<small>'+P.weeks+'-WEEK LOOK-AHEAD · '+esc(pRange().toUpperCase())+(j.number?' · JOB '+esc(j.number):'')+'</small></div>'+
+    '<div class="hlogo"><img src="'+HLOGO_PNG+'" alt="Haggerty"></div></div>'+
+    '<table><colgroup><col style="width:46px"><col style="width:150px"><col>'+ds.map(()=>'<col style="width:'+W+'px">').join("")+'</colgroup><thead><tr><th rowspan="3">ITEM<br>NO.</th><th rowspan="3">'+L.res.toUpperCase()+'</th><th rowspan="3">'+L.task.toUpperCase()+'</th>'+monthRuns(ds).map(r=>'<th colspan="'+r.c+'">'+(r.c>=2?MONTHS[r.m].toUpperCase():MO[r.m].toUpperCase())+'</th>').join("")+'</tr>'+
+    '<tr class="cm">'+ds.map(d=>'<th class="'+(isWE(d)?"we":"")+'">'+DOW[dow(d)][0]+'</th>').join("")+'</tr>'+
+    '<tr>'+ds.map(d=>'<th class="'+(isWE(d)?"we":"")+'">'+p(d).getDate()+'</th>').join("")+'</tr></thead><tbody>';
+  clientRows(j,ds).forEach(({t,n})=>{
+    if(t.sec){h+='<tr class="sec"><td>'+n+'</td><td></td><td colspan="'+(1+ds.length)+'" style="text-align:left;padding-left:14px">'+esc(t.name)+'</td></tr>';return}
+    h+='<tr><td>'+n+'</td><td>'+esc(t.res||"")+'</td><td class="act">'+esc(t.name)+'</td>'+ds.map(d=>{const v=t.cells[d];return '<td class="'+(v==="R"?"x cr":v?"x":isWE(d)?"we":"")+'">'+(v?"X":"")+'</td>'}).join("")+'</tr>'});
+  h+='<tr class="lg"><td></td><td colspan="2" style="background:#FFC000">Inspections, deliveries and deadlines</td>'+ds.map(d=>'<td class="'+(isWE(d)?"we":"")+'"></td>').join("")+'</tr>';
+  return h+'</tbody></table><div class="foot"><span>Haggerty · ADVISE. BUILD. RESTORE. MAINTAIN.</span><span>Prepared '+fmtLong(TODAY)+(j.sup?' · Superintendent: '+esc(j.sup):'')+'</span></div></article>'}
+
+/* ---------- Excel download in the same layout (ExcelJS, loaded on first use) ---------- */
+const EXCELJS_SRC="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
+let exP=null;
+function loadExcelJS(){if(window.ExcelJS)return Promise.resolve(window.ExcelJS);
+  return exP=exP||new Promise((ok,no)=>{const sc=document.createElement("script");sc.src=EXCELJS_SRC;sc.onload=()=>ok(window.ExcelJS);sc.onerror=()=>{exP=null;no(new Error("Making the Excel file needs an internet connection the first time. Try again with signal."))};document.head.appendChild(sc)})}
+const imgSize=src=>new Promise(ok=>{const im=new Image();im.onload=()=>ok({w:im.naturalWidth,h:im.naturalHeight});im.onerror=()=>ok({w:200,h:100});im.src=src});
+async function downloadXlsx(js,ds){
+  const btn=$("#xlsx");btn.disabled=true;btn.textContent="Making Excel…";
+  try{const EX=await loadExcelJS();const wb=new EX.Workbook();wb.creator="Haggerty Look-Ahead";
+    const hl=wb.addImage({base64:HLOGO_PNG,extension:"png"}),hs=await imgSize(HLOGO_PNG);
+    const used=new Set(),thin={style:"thin",color:{argb:"FF000000"}},box={top:thin,left:thin,bottom:thin,right:thin};
+    const fill=c=>({type:"pattern",pattern:"solid",fgColor:{argb:c}});const font=(o)=>Object.assign({name:"Aptos Narrow",size:11},o||{});
+    for(const j of js){const L=labels(j);
+      let nm=(j.number?j.number+" ":"")+(j.name||"Job");nm=nm.replace(/[\\/?*\[\]:]/g," ").slice(0,28).trim()||"Job";let k=2,base=nm;while(used.has(nm))nm=base.slice(0,25)+" "+(k++);used.add(nm);
+      const ws=wb.addWorksheet(nm,{pageSetup:{orientation:"landscape",paperSize:1,fitToPage:true,fitToWidth:1,fitToHeight:0,margins:{left:.25,right:.25,top:.3,bottom:.3,header:0,footer:0}},views:[{state:"frozen",ySplit:4,xSplit:3}]});
+      const last=3+ds.length;
+      ws.columns=[{width:6},{width:25.7},{width:49.3}].concat(ds.map(()=>({width:4.71})));
+      ws.getRow(1).height=100;
+      const hc=Math.min(8,ds.length);ws.mergeCells(1,1,1,2);ws.mergeCells(1,3,1,Math.max(3,last-hc));
+      const t=ws.getCell(1,3);t.value={richText:[{text:(j.name||"").toUpperCase()+" WEEKLY UPDATE\n",font:font({bold:true,size:28})},{text:P.weeks+"-WEEK LOOK-AHEAD · "+pRange().toUpperCase()+(j.number?" · JOB "+j.number:""),font:font({bold:true,size:12})}]};
+      t.alignment={horizontal:"center",vertical:"middle",wrapText:true};
+      if(j.logo){const ext=/^data:image\/png/.test(j.logo)?"png":"jpeg";const id=wb.addImage({base64:j.logo,extension:ext});const sz=await imgSize(j.logo);const sc=Math.min(190/sz.w,120/sz.h);
+        ws.addImage(id,{tl:{col:0.1,row:0.08},ext:{width:Math.round(sz.w*sc),height:Math.round(sz.h*sc)}})}
+      else if(j.client){const c=ws.getCell(1,1);c.value=j.client;c.font=font({bold:true,size:14});c.alignment={vertical:"middle",wrapText:true}}
+      const hsc=Math.min(260/hs.w,62/hs.h);ws.addImage(hl,{tl:{col:last-hc+0.2,row:0.25},ext:{width:Math.round(hs.w*hsc),height:Math.round(hs.h*hsc)}});
+      [["ITEM NO.",1],[L.res.toUpperCase(),2],[L.task.toUpperCase(),3]].forEach(([v,c])=>{ws.mergeCells(2,c,4,c);const x=ws.getCell(2,c);x.value=v;x.font=font({bold:true,size:c===1?8:11});x.alignment={horizontal:"center",vertical:"middle",wrapText:true}});
+      let col=4;monthRuns(ds).forEach(r=>{if(r.c>1)ws.mergeCells(2,col,2,col+r.c-1);const x=ws.getCell(2,col);x.value=r.c>=2?MONTHS[r.m].toUpperCase():MO[r.m].toUpperCase();x.font=font({bold:true});x.alignment={horizontal:"center"};col+=r.c});
+      ds.forEach((d,i)=>{const a=ws.getCell(3,4+i),b=ws.getCell(4,4+i);a.value=DOW[dow(d)][0];b.value=p(d).getDate();[a,b].forEach(x=>{x.font=font({bold:true});x.alignment={horizontal:"center"};if(isWE(d))x.fill=fill("FFD9D9D9")})});
+      let r=5;clientRows(j,ds).forEach(({t,n})=>{const row=ws.getRow(r);row.height=19.9;row.getCell(1).value=n;
+        if(t.sec){row.getCell(3).value=t.name.toUpperCase();for(let c=1;c<=last;c++){row.getCell(c).fill=fill("FFB4CDEB");row.getCell(c).font=font({bold:true})}}
+        else{row.getCell(2).value=t.res||"";row.getCell(3).value=t.name;ds.forEach((d,i)=>{const v=t.cells[d],x=row.getCell(4+i);if(v){x.value="X";if(v==="R")x.fill=fill("FFFFC000")}else if(isWE(d))x.fill=fill("FFD9D9D9")});
+          for(let c=1;c<=last;c++)if(!row.getCell(c).font||!row.getCell(c).font.bold)row.getCell(c).font=font()}
+        r++});
+      const lg=ws.getRow(r);ws.mergeCells(r,2,r,3);lg.getCell(2).value="Inspections, deliveries and deadlines";lg.getCell(2).fill=fill("FFFFC000");lg.getCell(2).font=font({bold:true});ds.forEach((d,i)=>{if(isWE(d))lg.getCell(4+i).fill=fill("FFD9D9D9")});
+      for(let y=2;y<=r;y++)for(let c=1;c<=last;c++){const x=ws.getCell(y,c);x.border=box;if(y>4)x.alignment={horizontal:"center",vertical:"middle"}}
+      ws.pageSetup.printArea="A1:"+ws.getColumn(last).letter+r;
+    }
+    const buf=await wb.xlsx.writeBuffer();const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(js.length===1?((js[0].number?js[0].number+" ":"")+js[0].name):"Look-aheads")+" "+P.start+".xlsx";document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);toast("Excel file ready")}
+  catch(e){toast(e.message)}finally{btn.disabled=false;btn.textContent="Download Excel"}}
 function sheetHTML(j,ds,i,n){
   const L=labels(j);const W=Math.max(16,Math.min(26,Math.floor(560/ds.length)));
   let h='<article class="sheet"><div class="sh-top"><div class="sh-logo">'+LOGO+'<div><b>HAGGERTY</b><small>ADVISE. BUILD. RESTORE. MAINTAIN.</small></div></div>'+
