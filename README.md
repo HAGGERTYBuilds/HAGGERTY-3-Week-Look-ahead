@@ -43,6 +43,12 @@ Each job's client name and logo are set on the job page (Client › Add client l
 
 Printed sheets default to 3 weeks from this Monday, whatever the screen shows. Only tasks with work in those weeks print (with their section headings), and the print screen lets you change the weeks (1-4) or include every task.
 
+## ⭐ Tell marketing
+
+A super picks **⭐ Tell marketing** on a job and taps a day to star a milestone (pour, steel set, roof, ribbon cutting) with a short note. Stars are kept apart from the blue/red days (`la_tasks.stars`), so the client printout, the Excel file and the internal sheet never show them, and leaders with view-only access never get them. Stars move with the task on Lost day and when a task is shifted.
+
+The marketing dashboard reads them twice a weekday through `la_marketing_feed` (needs the feed key in `la_feed_keys`), shows them on Liam's Home and emails him 3 workdays ahead. See `sql/04_marketing_stars.sql`.
+
 ## Importing existing schedules
 
 Admins tap **Import schedule** and pick a file. A preview shows the job name, Job #, type, which super it goes to, and how many tasks were found, before anything is saved.
