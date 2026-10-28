@@ -119,6 +119,7 @@ thead .stick{z-index:3}
 .grid.paint td.d{touch-action:none}
 .grid td.d.b{background:var(--blue)}
 .grid td.d.r{background:var(--red)}
+.grid td.d{position:relative}.star{color:#F5B301;font-size:17px;line-height:1;text-shadow:0 0 2px rgba(0,0,0,.55);pointer-events:none}.grid td.d .star{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}.star.inl{margin-right:4px;text-shadow:none}
 .grid td.d:hover:not(.b):not(.r){background:var(--blue-soft)}
 .grid td.d.b.today,.grid td.d.r.today{box-shadow:inset 2px 0 0 var(--brand),inset -2px 0 0 var(--brand)}
 
@@ -420,7 +421,7 @@ function loadPrefs(){try{const p=JSON.parse(ls.get(KEY+":prefs")||"{}");S.weeks=
 function loadCache(){try{const d=JSON.parse(ls.get(cacheKey())||"null");if(d){S.jobs=d.jobs||[];S.synced=d.synced||{};S.archived=d.archived||[];S.supers=d.supers||[];return true}}catch(e){}return false}
 /* jobJSON is what the server stores; a job is dirty when it differs from the last copy the server accepted */
 const jobJSON=(j,i)=>JSON.stringify({id:j.id,superId:j.superId||null,number:j.number||"",name:j.name||"",mode:j.mode,cm:j.cm||"",sup:j.sup||"",color:j.color,weekends:!!j.weekends,sort:i,
-  tasks:j.tasks.map(t=>({id:t.id,name:t.name||"",res:t.res||"",sec:!!t.sec,after:t.after||null,cells:t.cells||{}}))});
+  tasks:j.tasks.map(t=>({id:t.id,name:t.name||"",res:t.res||"",sec:!!t.sec,after:t.after||null,cells:t.cells||{},stars:t.stars||{}}))});
 function save(){persist();if(!S.demo&&!isViewer())scheduleSync()}
 let syncTimer=null,syncing=false;
 function setSync(state,text){const el=$("#sync");if(!el)return;el.hidden=S.demo||!S.me;el.className="sync"+(state?" "+state:"");el.querySelector("span").textContent=text}
@@ -449,7 +450,7 @@ async function pull(){
   /* keep local edits that have not reached the server yet */
   const local=new Map(S.jobs.map((j,i)=>[j.id,{j,i}]));
   const merged=server.map(sj=>{const l=local.get(sj.id);if(l&&S.synced[sj.id]!==jobJSON(l.j,l.i))return l.j;
-    S.synced[sj.id]=null;const j={...sj,tasks:(sj.tasks||[]).map(t=>({...t,cells:t.cells||{}}))};return j});
+    S.synced[sj.id]=null;const j={...sj,tasks:(sj.tasks||[]).map(t=>({...t,cells:t.cells||{},stars:t.stars||{}}))};return j});
   S.jobs.forEach((j,i)=>{if(!server.some(x=>x.id===j.id)&&!S.synced[j.id]&&!S.archived.includes(j.id))merged.push(j)});
   S.jobs=merged.filter(j=>!S.archived.includes(j.id));
   S.jobs.forEach((j,i)=>{const sj=server.find(x=>x.id===j.id);if(sj&&S.synced[j.id]===null)S.synced[j.id]=jobJSON(j,i)});
@@ -475,7 +476,8 @@ const tEnd=t=>{const ks=Object.keys(t.cells||{});return ks.length?ks.sort()[ks.l
 const labels=j=>j.mode==="com"?{id:"Item",task:"Activity",res:"Responsible",cm:"PM",kind:"Commercial"}:{id:"ID",task:"Task name",res:"Resource",cm:"Claims mgr",kind:"Restoration"};
 
 /* ---------- scheduling logic: shifts and auto-adjust ---------- */
-function shiftTask(j,t,n){if(!n)return;const c={};for(const [d,v] of Object.entries(t.cells))c[addWork(d,n,j.weekends)]=v;t.cells=c}
+function shiftTask(j,t,n){if(!n)return;const c={};for(const [d,v] of Object.entries(t.cells))c[addWork(d,n,j.weekends)]=v;t.cells=c;
+  if(t.stars){const st={};for(const [d,v] of Object.entries(t.stars))st[addWork(d,n,j.weekends)]=v;t.stars=st}}
 function dependents(j,t){return j.tasks.filter(x=>x.after===t.id)}
 function shiftWithDeps(j,t,n,seen=new Set()){if(seen.has(t.id))return;seen.add(t.id);shiftTask(j,t,n);dependents(j,t).forEach(x=>shiftWithDeps(j,x,n,seen))}
 /* push any task that now starts on/before its predecessor's finish to the next workday after it */
@@ -486,7 +488,8 @@ function reflow(j){const moved=new Set();for(let guard=0;guard<60;guard++){let c
     if(n<1)n=1;shiftTask(j,t,n);moved.add(t.id);ch=true}
   if(!ch)break}return moved.size}
 function lostDay(j,from){let count=0;for(const t of j.tasks){const c={};let hit=false;for(const [d,v] of Object.entries(t.cells||{})){if(d>=from){c[addWork(d,1,j.weekends)]=v;hit=true}else c[d]=v}
-  if(hit){t.cells=c;count++}}reflow(j);return count}
+  if(hit){t.cells=c;count++}
+  if(t.stars){const st={};for(const [d,v] of Object.entries(t.stars))st[d>=from?addWork(d,1,j.weekends):d]=v;t.stars=st}}reflow(j);return count}
 function isAncestor(j,maybeAnc,t){let cur=maybeAnc,seen=new Set();while(cur&&!seen.has(cur.id)){if(cur.id===t.id)return true;seen.add(cur.id);cur=j.tasks.find(x=>x.id===cur.after)}return false}
 
 /* ---------- UI helpers ---------- */
@@ -637,12 +640,12 @@ function renderJob(){
     '<div class="field"><span>Crew works weekends</span><label class="chk"><input type="checkbox" id="wkend"'+(j.weekends?" checked":"")+'> Count Sat and Sun as workdays</label></div></div>'
     :'<div class="panel jobhead">'+[["Job #",j.number],[j.mode==="com"?"Project":"Name / address",j.name],[L.cm,j.cm],["Super",j.sup||S.me.name]].map(([a,b])=>'<div class="ro field"><span>'+a+'</span><b>'+esc(b||"–")+'</b></div>').join("")+'</div>')+
     (isViewer()?'':'<div class="clientbar"><span class="hint" style="font-weight:700;letter-spacing:.08em;text-transform:uppercase">Client</span>'+(j.logo?'<img class="cthumb" src="'+esc(j.logo)+'" alt="">':'')+'<span>'+esc(j.client||(j.logo?"":"No client logo yet"))+'</span><button class="btn sm" id="clientbtn">'+(j.logo||j.client?"Change…":"Add client logo…")+'</button><span class="hint">Shows on the client printout.</span></div>')+
-    (isViewer()?'<p class="hint">View only. '+esc(j.sup||superName(j.superId)||"The super")+' keeps this look-ahead up to date.</p>':ls.get(KEY+":help")?'':'<div class="help" id="help"><div style="flex:1"><h3>How to update this look-ahead</h3><ol><li>Tap a day box to mark it: once for <b style="color:var(--blue)">blue</b> (work scheduled), twice for <b style="color:var(--red)">red</b> (critical: inspection, delivery, deadline), three times to clear it.</li><li>Tap <b>⋯</b> on a task to move it a day, delete it, or set what it starts after.</li><li>Rain day? Tap <b>Lost day…</b> and everything slides one workday.</li><li>Everything saves by itself, even with no signal.</li></ol></div><button class="btn sm" id="helpx">Got it</button></div>')+
+    (isViewer()?'<p class="hint">View only. '+esc(j.sup||superName(j.superId)||"The super")+' keeps this look-ahead up to date.</p>':ls.get(KEY+":help")?'':'<div class="help" id="help"><div style="flex:1"><h3>How to update this look-ahead</h3><ol><li>Tap a day box to mark it: once for <b style="color:var(--blue)">blue</b> (work scheduled), twice for <b style="color:var(--red)">red</b> (critical: inspection, delivery, deadline), three times to clear it.</li><li>Tap <b>⋯</b> on a task to move it a day, delete it, or set what it starts after.</li><li>Rain day? Tap <b>Lost day…</b> and everything slides one workday.</li><li>Big milestone coming (pour, steel, roof, ribbon cutting)? Pick <b>⭐ Tell marketing</b> and tap the day. It never prints.</li><li>Everything saves by itself, even with no signal.</li></ol></div><button class="btn sm" id="helpx">Got it</button></div>')+
     '<div class="toolbar">'+windowBar()+'<span class="spacer"></span>'+(isViewer()?'</div>':
-    '<div class="seg" role="group" aria-label="What a tap does">'+[["cycle","Tap to change"],["B",'<i class="sw b"></i>Blue brush'],["R",'<i class="sw r"></i>Red brush'],["",'Eraser']].map(([v,l])=>'<button data-brush="'+v+'" aria-pressed="'+(S.brush===v)+'">'+l+'</button>').join("")+'</div></div>'+
-    '<p class="hint" style="margin:-4px 0 10px">'+(S.brush==="cycle"?"Tap a day: blank → blue → red → blank.":"Drag your finger across days to paint them. Tap “Tap to change” again to scroll the grid.")+' Start and End fill in by themselves, and tasks set to start after a late task move out automatically.</p>');
+    '<div class="seg" role="group" aria-label="What a tap does">'+[["cycle","Tap to change"],["B",'<i class="sw b"></i>Blue brush'],["R",'<i class="sw r"></i>Red brush'],["",'Eraser'],["S",'⭐ Tell marketing']].map(([v,l])=>'<button data-brush="'+v+'" aria-pressed="'+(S.brush===v)+'">'+l+'</button>').join("")+'</div></div>'+
+    '<p class="hint" style="margin:-4px 0 10px">'+(S.brush==="S"?"Tap a day to star a milestone for marketing (pour, steel, roof, a big delivery, ribbon cutting). Liam gets a heads-up a few days before so he can plan photos. Stars never print and only you and Liam see them.":S.brush==="cycle"?"Tap a day: blank → blue → red → blank.":"Drag your finger across days to paint them. Tap “Tap to change” again to scroll the grid.")+' Start and End fill in by themselves, and tasks set to start after a late task move out automatically.</p>');
   const lc=6;
-  h+='<div class="scroller"><table class="grid'+(S.brush!=="cycle"?" paint":"")+'" id="grid"><thead>'+monthHeader(ds,lc,'<th class="stick" colspan="2"></th><th colspan="4"></th>')+
+  h+='<div class="scroller"><table class="grid'+(S.brush!=="cycle"&&S.brush!=="S"?" paint":"")+'" id="grid"><thead>'+monthHeader(ds,lc,'<th class="stick" colspan="2"></th><th colspan="4"></th>')+
     '<tr class="dy"><th class="stick c-id">'+L.id+'</th><th class="stick c-task" style="text-align:left;padding-left:8px">'+L.task+'</th><th class="c-res" style="text-align:left;padding-left:8px">'+L.res+'</th><th class="c-dt">Start</th><th class="c-dt">End</th><th class="c-act"></th>'+dayHeads(ds)+'</tr></thead><tbody>';
   let n=0;
   j.tasks.forEach(t=>{
@@ -651,9 +654,9 @@ function renderJob(){
     h+='<tr data-t="'+t.id+'"><td class="stick c-id">'+n+'</td><td class="stick c-task"><input class="cell" data-f="name" value="'+esc(t.name)+'" placeholder="New task" aria-label="Task name"'+(isViewer()?" readonly":"")+'>'+(pr?'<span class="dep">after '+esc(pr.name)+'</span>':'')+'</td>'+
       '<td class="c-res"><input class="cell" data-f="res" value="'+esc(t.res||"")+'" aria-label="'+L.res+'"'+(isViewer()?" readonly":"")+'></td><td class="c-dt" data-s>'+fmt(tStart(t))+'</td><td class="c-dt" data-e>'+fmt(tEnd(t))+'</td>'+
       '<td class="c-act">'+(isViewer()?'':'<button class="iconbtn" data-menu="'+t.id+'" aria-label="Task options">⋯</button>')+'</td>';
-    ds.forEach(d=>{const v=t.cells[d];h+='<td class="d'+(v==="B"?" b":v==="R"?" r":"")+(isWE(d)?" we":"")+(dow(d)===1?" wk":"")+(d===TODAY?" today":"")+'" data-d="'+d+'" aria-label="'+esc(t.name)+" "+fmtLong(d)+'"></td>'});
+    ds.forEach(d=>{const v=t.cells[d];h+='<td class="d'+(v==="B"?" b":v==="R"?" r":"")+(isWE(d)?" we":"")+(dow(d)===1?" wk":"")+(d===TODAY?" today":"")+'" data-d="'+d+'" aria-label="'+esc(t.name)+" "+fmtLong(d)+(t.stars&&t.stars[d]?", starred for marketing: "+esc(t.stars[d]):"")+'"'+(t.stars&&t.stars[d]?' title="⭐ '+esc(t.stars[d])+'"':"")+'>'+(t.stars&&t.stars[d]?'<span class="star">★</span>':"")+'</td>'});
     h+='</tr>'});
-  h+='</tbody></table></div><div class="row" style="margin-top:12px">'+(isViewer()?'':'<button class="btn" id="addtask">+ Task</button><button class="btn" id="addsec">+ Section</button>')+'<span class="spacer"></span><div class="legend"><span><i class="sw b"></i>Scheduled work</span><span><i class="sw r"></i>Critical</span></div>'+(isAdmin()?'<button class="btn ghost sm danger" id="deljob">Delete job</button>':'')+'</div>';
+  h+='</tbody></table></div><div class="row" style="margin-top:12px">'+(isViewer()?'':'<button class="btn" id="addtask">+ Task</button><button class="btn" id="addsec">+ Section</button>')+'<span class="spacer"></span><div class="legend"><span><i class="sw b"></i>Scheduled work</span><span><i class="sw r"></i>Critical</span>'+(isViewer()?'':'<span><span class="star inl">★</span>For marketing</span>')+'</div>'+(isAdmin()?'<button class="btn ghost sm danger" id="deljob">Delete job</button>':'')+'</div>';
   $("#app").innerHTML=h;bindJob(j);
 }
 function field(label,key,val){return '<label class="field"><span>'+label+'</span><input type="text" data-jf="'+key+'" value="'+esc(val)+'"></label>'}
@@ -678,10 +681,11 @@ function bindJob(j){
   const grid=$("#grid");
   grid.addEventListener("change",e=>{const i=e.target.closest("input.cell");if(!i)return;const t=j.tasks.find(x=>x.id===i.closest("tr").dataset.t);t[i.dataset.f]=i.value;j.example=false;save()});
   grid.addEventListener("click",e=>{const m=e.target.closest("[data-menu]");if(m){taskMenu(j,j.tasks.find(x=>x.id===m.dataset.menu));return}
-    const td=e.target.closest("td.d");if(!td||S.brush!=="cycle")return;const t=j.tasks.find(x=>x.id===td.parentNode.dataset.t);
+    const td=e.target.closest("td.d");if(td&&S.brush==="S"){starDialog(j,j.tasks.find(x=>x.id===td.parentNode.dataset.t),td.dataset.d);return}
+    if(!td||S.brush!=="cycle")return;const t=j.tasks.find(x=>x.id===td.parentNode.dataset.t);
     const nv=cycle(t.cells[td.dataset.d]);setCell(t,td,nv);after(j,td.parentNode,t)});
   let painting=null;
-  grid.addEventListener("pointerdown",e=>{if(S.brush==="cycle")return;const td=e.target.closest("td.d");if(!td)return;e.preventDefault();painting={tr:td.parentNode,t:j.tasks.find(x=>x.id===td.parentNode.dataset.t)};setCell(painting.t,td,S.brush)});
+  grid.addEventListener("pointerdown",e=>{if(S.brush==="cycle"||S.brush==="S")return;const td=e.target.closest("td.d");if(!td)return;e.preventDefault();painting={tr:td.parentNode,t:j.tasks.find(x=>x.id===td.parentNode.dataset.t)};setCell(painting.t,td,S.brush)});
   grid.addEventListener("pointermove",e=>{if(!painting)return;const el=document.elementFromPoint(e.clientX,e.clientY);const td=el&&el.closest&&el.closest("td.d");if(td&&td.parentNode===painting.tr)setCell(painting.t,td,S.brush)});
   const end=()=>{if(!painting)return;const pt=painting;painting=null;after(j,pt.tr,pt.t)};
   window.onpointerup=end;window.onpointercancel=end;
@@ -689,6 +693,18 @@ function bindJob(j){
 function setCell(t,td,v){const d=td.dataset.d;if(v)t.cells[d]=v;else delete t.cells[d];td.classList.toggle("b",v==="B");td.classList.toggle("r",v==="R")}
 function after(j,tr,t){j.example=false;tr.querySelector("[data-s]").textContent=fmt(tStart(t));tr.querySelector("[data-e]").textContent=fmt(tEnd(t));
   const moved=reflow(j);save();if(moved){render();toast(moved===1?"Moved 1 later task to keep the order":"Moved "+moved+" later tasks to keep the order")}}
+
+/* ⭐ for marketing: kept in t.stars, never in t.cells, so no printout or Excel file shows it */
+function starDialog(j,t,d){const cur=(t.stars||{})[d];
+  modal('<div class="eyebrow">⭐ Tell marketing · '+fmtLong(d)+'</div><h2>'+esc(t.name||"Untitled")+'</h2>'+
+    '<p class="muted">Liam gets a heads-up a few days before so he can be there for photos. Only you and Liam see stars; they never print.</p>'+
+    '<label class="field"><span>What’s happening?</span><input type="text" id="st-note" maxlength="120" placeholder="e.g. Slab pour, steel set, ribbon cutting" value="'+esc(cur||"")+'"></label>'+
+    '<div class="row">'+(cur!==undefined?'<button class="btn danger" id="st-del">Remove star</button>':'')+'<span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="st-go">'+(cur!==undefined?"Save":"Star it")+'</button></div>',
+  close=>{const n=$("#st-note");n.focus();
+    const done=v=>{t.stars=Object.assign({},t.stars||{});if(v===null)delete t.stars[d];else t.stars[d]=v;j.example=false;save();close();render();toast(v===null?"Star removed":"Starred for marketing")};
+    $("#st-go").onclick=()=>done(n.value.trim()||t.name||"Milestone");
+    n.onkeydown=e=>{if(e.key==="Enter")$("#st-go").click()};
+    const x=$("#st-del");x&&(x.onclick=()=>done(null))})}
 
 function taskMenu(j,t){
   const opts=j.tasks.filter(x=>!x.sec&&x.id!==t.id&&!isAncestor(j,x,t)).map(x=>'<option value="'+x.id+'"'+(x.id===t.after?" selected":"")+'>'+esc(x.name||"Untitled")+'</option>').join("");
